@@ -3,7 +3,7 @@ import {useEffect, useRef, useState} from 'react';
 import ReactiveSpectrum from './ReactiveSpectrum';
 
 type Obj={x:number;y:number;scale:number;rotate:number};
-declare global { interface Element { onclick: ((event: MouseEvent) => void) | null; } }
+declare global { interface Element { onclick: ((event: MouseEvent) => void) | null; dataset: DOMStringMap; } }
 const formats=[['story','استوری / ریلز','9:16'],['square','پست مربعی','1:1'],['youtube','یوتیوب','16:9'],['canvas','Spotify Canvas','9:16']];
 const spectra=[['Pulse bars','pulse-bars'],['Circular ring','circular'],['Waveform','waveform'],['Mirrored','mirrored'],['Particles','particles'],['Oscilloscope','oscillo'],['Liquid','liquid'],['Neon ring','neon-ring'],['Side spectrum','side-spectrum'],['Dual bulb','dual-bulb'],['Arc bars','arc-bars'],['Dot field','dot-field'],['Monstercat bars','monstercat'],['Aurora wave','aurora'],['3D linebed','linebed'],['Universe mesh','universe'],['Star field','star-field'],['Hex rings','hexagone'],['Pulse tunnel','tunnel'],['Orbital dots','orbital']];
 const effects=['None','Grain','Scanlines','RGB shift','Kaleidoscope','Light leak','Film burn','Strobe','Shake','Pulse','Glitch','Bloom','Pixelate','Noise','Rain','Bokeh','Color drift','Dream blur','Chromatic','Vignette','Lens flare','Soft focus'];
