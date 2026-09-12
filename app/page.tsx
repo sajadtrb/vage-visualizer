@@ -1,7 +1,6 @@
 'use client';
 import {useEffect, useRef, useState} from 'react';
 import ReactiveSpectrum from './ReactiveSpectrum';
-import ReactiveSpectrum from './ReactiveSpectrum';
 
 type Obj={x:number;y:number;scale:number;rotate:number};
 declare global { interface Element { onclick: ((event: MouseEvent) => void) | null; } }
