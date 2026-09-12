@@ -22,7 +22,7 @@ export default function ReactiveSpectrum({analyser,audio,mode,color,background=f
    // Logarithmic frequency buckets; no synthetic oscillator or idle animation.
    for(let i=0;i<96;i++){let v=0;if(a){const bin=a.context.sampleRate/a.fftSize;const lo=Math.max(1,Math.floor(35*Math.pow(16000/35,i/96)/bin)),hi=Math.min(frequency.length,Math.max(lo+1,Math.ceil(35*Math.pow(16000/35,(i+1)/96)/bin)));for(let j=lo;j<hi;j++)v=Math.max(v,frequency[j]/255)}smooth[i]=active?smooth[i]+(v-smooth[i])*(v>smooth[i]?.7:.22):0}
    travel+=dt*energy;
-   ctx.strokeStyle=color;ctx.fillStyle=color;ctx.lineWidth=1.4;ctx.shadowColor=color;ctx.shadowBlur=3+high*18;
+   const particleColor=getComputedStyle(canvas.parentElement!).getPropertyValue('--particle-color').trim()||color;const renderColor=background?particleColor:color;ctx.strokeStyle=renderColor;ctx.fillStyle=renderColor;ctx.lineWidth=1.4;ctx.shadowColor=renderColor;ctx.shadowBlur=3+high*18;
    const line=(points:number[][])=>{ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke()};
    const dot=(x:number,y:number,r:number)=>{ctx.beginPath();ctx.arc(x,y,Math.max(.4,r),0,Math.PI*2);ctx.fill()};
    if(background||['universe','star-field','particles','dot-field'].includes(mode)){
