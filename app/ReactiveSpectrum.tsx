@@ -31,7 +31,7 @@ export default function ReactiveSpectrum({analyser,audio,mode,color,background=f
     // MusicVid-style layered particles: tiny flecks, reactive core particles, and soft bokeh.
     points.forEach(([x,y,z],i)=>{const v=smooth[i%96]||0;ctx.globalAlpha=.2+reactive*.55+v*.45;dot(x,y,(background?.45:1)*z+high*3*z)});
     points.forEach(([x,y,z],i)=>{const v=smooth[(i*7)%96]||0;ctx.globalAlpha=.12+reactive*.42+v*.55;dot(x,y,(background?1.1:1.8)*z+reactive*3*z)});
-    points.filter((_,i)=>i%4===0).forEach(([x,y,z],i)=>{const v=smooth[(i*11)%96]||0;ctx.globalAlpha=.04+reactive*.2+v*.25;ctx.shadowBlur=10+reactive*28;dot(x,y,2.5*z+reactive*7*z)});ctx.shadowBlur=3+high*18;ctx.globalAlpha=1;
+    points.filter((_,i)=>i%4===0).forEach(([x,y,z],i)=>{const v=smooth[(i*11)%96]||0;ctx.globalAlpha=.04+reactive*.2+v*.25;ctx.shadowBlur=5+reactive*16;dot(x,y,1.15*z+reactive*2.8*z)});ctx.shadowBlur=3+high*18;ctx.globalAlpha=1;
    }else if(mode==='linebed'){
     if(active){history.unshift(Array.from(smooth));if(history.length>44)history.pop()}else history.length=0;
     ctx.shadowBlur=0;for(let row=43;row>=0;row--){const depth=1-row/55,values=history[row]||smooth;ctx.globalAlpha=.12+depth*.75;line(Array.from({length:96},(_,i)=>[w/2+(i/95-.5)*w*depth,h*(.95-row*.017)-values[i]*h*.32*depth]))}ctx.globalAlpha=1;
