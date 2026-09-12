@@ -18,7 +18,7 @@ export default function ReactiveSpectrum({analyser,audio,mode,color,background=f
    if(a&&frequency.length!==a.frequencyBinCount){frequency=new Uint8Array(a.frequencyBinCount);wave=new Uint8Array(a.fftSize)}
    if(active&&a){a.getByteFrequencyData(frequency);a.getByteTimeDomainData(wave)}else{frequency.fill(0);wave.fill(128)}
    const band=(lo:number,hi:number)=>{if(!a)return 0;const bin=a.context.sampleRate/a.fftSize;let sum=0,n=0;for(let i=Math.max(1,Math.ceil(lo/bin));i<Math.min(frequency.length,Math.ceil(hi/bin));i++){sum+=frequency[i]/255;n++}return n?sum/n:0};
-   const bass=band(30,250)*gain,mid=band(250,2500)*gain,high=band(2500,14000)*gain,energy=Math.min(1,(bass+mid+high)/3);
+   const bass=band(30,250)*gain,mid=band(250,2500)*gain,high=band(2500,14000)*gain,energy=Math.min(1,(bass+mid+high)/3),reactive=Math.min(1,energy*3.8);
    // Logarithmic frequency buckets; no synthetic oscillator or idle animation.
    for(let i=0;i<96;i++){let v=0;if(a){const bin=a.context.sampleRate/a.fftSize;const lo=Math.max(1,Math.floor(35*Math.pow(16000/35,i/96)/bin)),hi=Math.min(frequency.length,Math.max(lo+1,Math.ceil(35*Math.pow(16000/35,(i+1)/96)/bin)));for(let j=lo;j<hi;j++)v=Math.max(v,frequency[j]/255)}smooth[i]=active?smooth[i]+(v-smooth[i])*(v>smooth[i]?.7:.22):0}
    travel+=dt*energy;
@@ -26,9 +26,12 @@ export default function ReactiveSpectrum({analyser,audio,mode,color,background=f
    const line=(points:number[][])=>{ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke()};
    const dot=(x:number,y:number,r:number)=>{ctx.beginPath();ctx.arc(x,y,Math.max(.4,r),0,Math.PI*2);ctx.fill()};
    if(background||['universe','star-field','particles','dot-field'].includes(mode)){
-    const points=particles.map((p,i)=>{if(active){const local=smooth[i%96]||energy;p.x=(p.x+p.vx*dt*(.35+energy*3)+Math.sin(travel*2+p.phase)*dt*energy*.035+1)%1;p.y=(p.y+p.vy*dt*(.35+energy*3)+Math.cos(travel*1.7+p.phase)*dt*energy*.035+1)%1}const pulse=1+smooth[i%96]*.8+energy*.35;const x=p.x*w,y=p.y*h;return [x+(x-w/2)*bass*.08,y+(y-h/2)*bass*.08,p.z*pulse]});
+    const points=particles.map((p,i)=>{if(active){const local=smooth[i%96]||energy;p.x=(p.x+p.vx*dt*(.35+reactive*4)+Math.sin(travel*2+p.phase)*dt*reactive*.09+1)%1;p.y=(p.y+p.vy*dt*(.35+reactive*4)+Math.cos(travel*1.7+p.phase)*dt*reactive*.09+1)%1}const pulse=1+smooth[i%96]*1.6+reactive*.7;const x=p.x*w,y=p.y*h;return [x+(x-w/2)*bass*.16,y+(y-h/2)*bass*.16,p.z*pulse]});
     if(mode==='universe'){ctx.shadowBlur=0;for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++){const distance=Math.hypot(points[i][0]-points[j][0],points[i][1]-points[j][1]);if(distance<Math.min(w,h)*.22){ctx.globalAlpha=(1-distance/(Math.min(w,h)*.22))*(.12+mid*.65);line([points[i],points[j]])}}}
-    points.forEach(([x,y,z],i)=>{ctx.globalAlpha=.08+energy*.5+smooth[i%96]*.4;dot(x,y,(background?1:1.8)*z+high*2*z)});ctx.globalAlpha=1;
+    // MusicVid-style layered particles: tiny flecks, reactive core particles, and soft bokeh.
+    points.forEach(([x,y,z],i)=>{const v=smooth[i%96]||0;ctx.globalAlpha=.2+reactive*.55+v*.45;dot(x,y,(background?.45:1)*z+high*3*z)});
+    points.forEach(([x,y,z],i)=>{const v=smooth[(i*7)%96]||0;ctx.globalAlpha=.12+reactive*.42+v*.55;dot(x,y,(background?1.1:1.8)*z+reactive*3*z)});
+    points.filter((_,i)=>i%4===0).forEach(([x,y,z],i)=>{const v=smooth[(i*11)%96]||0;ctx.globalAlpha=.04+reactive*.2+v*.25;ctx.shadowBlur=10+reactive*28;dot(x,y,2.5*z+reactive*7*z)});ctx.shadowBlur=3+high*18;ctx.globalAlpha=1;
    }else if(mode==='linebed'){
     if(active){history.unshift(Array.from(smooth));if(history.length>44)history.pop()}else history.length=0;
     ctx.shadowBlur=0;for(let row=43;row>=0;row--){const depth=1-row/55,values=history[row]||smooth;ctx.globalAlpha=.12+depth*.75;line(Array.from({length:96},(_,i)=>[w/2+(i/95-.5)*w*depth,h*(.95-row*.017)-values[i]*h*.32*depth]))}ctx.globalAlpha=1;
