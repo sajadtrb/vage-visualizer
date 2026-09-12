@@ -1,14 +1,14 @@
 'use client';
 import {useEffect,useRef, type RefObject} from 'react';
 
-export default function ReactiveSpectrum({analyser,audio,mode,color,background=false,gain=1,particleCount=100}:{analyser:RefObject<AnalyserNode|null>;audio:RefObject<HTMLAudioElement|null>;mode:string;color:string;background?:boolean;gain?:number;particleCount?:number}){
+export default function ReactiveSpectrum({analyser,audio,mode,color,background=false,gain=1,particleCount=100,seed=1}:{analyser:RefObject<AnalyserNode|null>;audio:RefObject<HTMLAudioElement|null>;mode:string;color:string;background?:boolean;gain?:number;particleCount?:number;seed?:number}){
  const ref=useRef<HTMLCanvasElement>(null);
  useEffect(()=>{
   const canvas=ref.current!;const ctx=canvas.getContext('2d')!;
   let frame=0,last=0,travel=0;const history:number[][]=[];
   let frequency=new Uint8Array(0),wave=new Uint8Array(0);
   const smooth=new Float32Array(96);
-  const particles=Array.from({length:Math.max(10,particleCount)},(_,i)=>({x:((i*0.61803398875)%1),y:((i*0.41421356237)%1),z:.25+(i%7)/9}));
+  const particles=Array.from({length:Math.max(10,particleCount)},(_,i)=>({x:((i*0.61803398875+seed*.137)%1),y:((i*0.41421356237+seed*.271)%1),z:.25+(i%7)/9}));
   const draw=(now:number)=>{
    const dt=Math.min(.05,(now-last)/1000||0);last=now;
    const w=canvas.clientWidth,h=canvas.clientHeight,dpr=Math.min(devicePixelRatio,2);
@@ -27,7 +27,7 @@ export default function ReactiveSpectrum({analyser,audio,mode,color,background=f
    const dot=(x:number,y:number,r:number)=>{ctx.beginPath();ctx.arc(x,y,Math.max(.4,r),0,Math.PI*2);ctx.fill()};
    if(background||['universe','star-field','particles','dot-field'].includes(mode)){
     const points=particles.map((p,i)=>{const x=((p.x+travel*p.z*.12)%1)*w,y=((p.y+travel*p.z*.07)%1)*h;return [x+(x-w/2)*bass*.08,y+(y-h/2)*bass*.08,p.z]});
-    if(mode==='universe'&&!background){ctx.shadowBlur=0;for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++){const distance=Math.hypot(points[i][0]-points[j][0],points[i][1]-points[j][1]);if(distance<Math.min(w,h)*.22){ctx.globalAlpha=(1-distance/(Math.min(w,h)*.22))*(.12+mid*.65);line([points[i],points[j]])}}}
+    if(mode==='universe'){ctx.shadowBlur=0;for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++){const distance=Math.hypot(points[i][0]-points[j][0],points[i][1]-points[j][1]);if(distance<Math.min(w,h)*.22){ctx.globalAlpha=(1-distance/(Math.min(w,h)*.22))*(.12+mid*.65);line([points[i],points[j]])}}}
     points.forEach(([x,y,z],i)=>{ctx.globalAlpha=.08+energy*.5+smooth[i%96]*.4;dot(x,y,(background?1:1.8)*z+high*2*z)});ctx.globalAlpha=1;
    }else if(mode==='linebed'){
     if(active){history.unshift(Array.from(smooth));if(history.length>44)history.pop()}else history.length=0;
@@ -42,6 +42,6 @@ export default function ReactiveSpectrum({analyser,audio,mode,color,background=f
    }
    canvas.dataset.energy=energy.toFixed(4);canvas.dataset.playing=String(active);frame=requestAnimationFrame(draw);
   };frame=requestAnimationFrame(draw);return()=>cancelAnimationFrame(frame);
- },[analyser,audio,mode,color,background,gain,particleCount]);
+ },[analyser,audio,mode,color,background,gain,particleCount,seed]);
  return <canvas ref={ref} aria-label={background?'ذرات واکنش‌گرا به صدا':`طیف صوتی ${mode}`} style={{width:'100%',height:'100%',display:'block',pointerEvents:'none'}}/>;
 }
