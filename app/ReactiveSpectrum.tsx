@@ -8,7 +8,7 @@ export default function ReactiveSpectrum({analyser,audio,mode,color,background=f
   let frame=0,last=0,travel=0;const history:number[][]=[];
   let frequency=new Uint8Array(0),wave=new Uint8Array(0);
   const smooth=new Float32Array(96);
-  const particles=Array.from({length:Math.max(10,particleCount)},(_,i)=>({x:((i*0.61803398875+seed*.137)%1),y:((i*0.41421356237+seed*.271)%1),z:.25+(i%7)/9}));
+  const particles=Array.from({length:Math.max(10,particleCount)},(_,i)=>{const n=Math.sin(i*91.17+seed*17.3)*43758.5453;const r=n-Math.floor(n);const n2=Math.sin(i*37.71+seed*41.9)*43758.5453;const r2=n2-Math.floor(n2);return{x:((i*0.61803398875+seed*.137)%1),y:((i*0.41421356237+seed*.271)%1),vx:(r-.5)*.08,vy:(r2-.5)*.08,z:.25+(i%7)/9,phase:r*Math.PI*2}});
   const draw=(now:number)=>{
    const dt=Math.min(.05,(now-last)/1000||0);last=now;
    const w=canvas.clientWidth,h=canvas.clientHeight,dpr=Math.min(devicePixelRatio,2);
@@ -26,7 +26,7 @@ export default function ReactiveSpectrum({analyser,audio,mode,color,background=f
    const line=(points:number[][])=>{ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke()};
    const dot=(x:number,y:number,r:number)=>{ctx.beginPath();ctx.arc(x,y,Math.max(.4,r),0,Math.PI*2);ctx.fill()};
    if(background||['universe','star-field','particles','dot-field'].includes(mode)){
-    const points=particles.map((p,i)=>{const x=((p.x+travel*p.z*.12)%1)*w,y=((p.y+travel*p.z*.07)%1)*h;return [x+(x-w/2)*bass*.08,y+(y-h/2)*bass*.08,p.z]});
+    const points=particles.map((p,i)=>{if(active){const local=smooth[i%96]||energy;p.x=(p.x+p.vx*dt*(.35+energy*3)+Math.sin(travel*2+p.phase)*dt*energy*.035+1)%1;p.y=(p.y+p.vy*dt*(.35+energy*3)+Math.cos(travel*1.7+p.phase)*dt*energy*.035+1)%1}const pulse=1+smooth[i%96]*.8+energy*.35;const x=p.x*w,y=p.y*h;return [x+(x-w/2)*bass*.08,y+(y-h/2)*bass*.08,p.z*pulse]});
     if(mode==='universe'){ctx.shadowBlur=0;for(let i=0;i<points.length;i++)for(let j=i+1;j<points.length;j++){const distance=Math.hypot(points[i][0]-points[j][0],points[i][1]-points[j][1]);if(distance<Math.min(w,h)*.22){ctx.globalAlpha=(1-distance/(Math.min(w,h)*.22))*(.12+mid*.65);line([points[i],points[j]])}}}
     points.forEach(([x,y,z],i)=>{ctx.globalAlpha=.08+energy*.5+smooth[i%96]*.4;dot(x,y,(background?1:1.8)*z+high*2*z)});ctx.globalAlpha=1;
    }else if(mode==='linebed'){
