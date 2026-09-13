@@ -3,6 +3,7 @@ import {useEffect, useRef, useState} from 'react';
 import ReactiveSpectrum from './ReactiveSpectrum';
 import ExportSettings from './ExportSettings';
 import BackgroundTools from './BackgroundTools';
+import ProjectManager from './ProjectManager';
 import {createRoot} from 'react-dom/client';
 
 type Obj={x:number;y:number;scale:number;rotate:number;opacity?:number;z?:number};
