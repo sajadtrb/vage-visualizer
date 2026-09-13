@@ -14,3 +14,4 @@
 .text-style-controls .text-colour-control input{height:32px;padding:2px}.text-style-controls .text-direction-row{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:-7px 0 8px}.spectrum-colour-control{padding-top:0}.spectrum-colour-control .color-line{margin:0}
 .platform-logo{resize:both;overflow:visible;min-width:18px;min-height:18px}
 .platform-logo.object-selected{cursor:grab;outline:1px dashed var(--accent);outline-offset:7px}.platform-logo.object-selected::after{content:'↘';position:absolute;right:-14px;bottom:-16px;color:var(--accent);font-size:14px;line-height:1;pointer-events:none}
+.duration-sync{width:100%;padding:8px;border:1px solid #46513d;background:#222a1d;color:#d6ff3f;font-size:11px}.duration-sync:disabled{opacity:.5;color:#91a088}.export-render:disabled{opacity:.55;cursor:wait}
