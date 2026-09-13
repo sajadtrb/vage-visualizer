@@ -6,11 +6,11 @@ export type ExportPreset={width:number;height:number;fps:24|30|60;quality:'stand
 
 export default function ExportSettings({onClose,audioDuration=0,onRender}:{onClose:()=>void;audioDuration?:number;onRender?:()=>void}){
  const [preset,setPreset]=useState<ExportPreset>({width:1080,height:1920,fps:30,quality:'high',duration:30,format:'mp4'});
- const [rendering,setRendering]=useState(false);const [detectedDuration,setDetectedDuration]=useState(audioDuration);
+ const [rendering,setRendering]=useState(false);const [renderMessage,setRenderMessage]=useState('');const [detectedDuration,setDetectedDuration]=useState(audioDuration);
  const musicDuration=detectedDuration||audioDuration;
  useEffect(()=>{const audio=document.querySelector('audio');const sync=()=>{if(audio&&Number.isFinite(audio.duration)&&audio.duration>0)setDetectedDuration(audio.duration)};sync();audio?.addEventListener('loadedmetadata',sync);return()=>audio?.removeEventListener('loadedmetadata',sync)},[]);
  useEffect(()=>{if(Number.isFinite(musicDuration)&&musicDuration>0)setPreset(p=>({...p,duration:Math.min(600,Math.max(1,Math.round(musicDuration)))}))},[musicDuration]);
- const render=()=>{setRendering(true);onRender?.();window.setTimeout(()=>setRendering(false),900)};
+ const render=()=>{setRendering(true);setRenderMessage('Preparing the offline MP4 renderer…');onRender?.();window.setTimeout(()=>{setRendering(false);setRenderMessage('The export engine is not connected yet. The project is ready, but MP4 encoding needs the local FFmpeg engine.');},900)};
  return <section className="export-settings" aria-label="Export settings">
   <header><strong>Export video</strong><button onClick={onClose}>×</button></header>
   <label>Resolution<select value={`${preset.width}x${preset.height}`} onChange={e=>{const [width,height]=e.target.value.split('x').map(Number);setPreset(p=>({...p,width,height}))}}><option value="1080x1920">1080 × 1920 · Reel / Story</option><option value="1080x1080">1080 × 1080 · Square</option><option value="1920x1080">1920 × 1080 · YouTube</option><option value="2160x2160">2160 × 2160 · 4K Square</option></select></label>
@@ -19,6 +19,7 @@ export default function ExportSettings({onClose,audioDuration=0,onRender}:{onClo
   <label>Duration (seconds)<input type="number" min="1" max="600" value={preset.duration} onChange={e=>setPreset(p=>({...p,duration:Math.max(1,Number(e.target.value)||1)}))}/></label>
   <button type="button" className="duration-sync" disabled={!musicDuration} onClick={()=>setPreset(p=>({...p,duration:Math.min(600,Math.max(1,Math.round(musicDuration)))}))}>{musicDuration?'Use music duration':'Add music to detect duration'}</button>
   <p>MP4 export is rendered from the project canvas at {preset.width}×{preset.height}, {preset.fps} fps.</p>
+  {renderMessage&&<p className="export-status" role="status">{renderMessage}</p>}
   <button className="export-render" type="button" onClick={render} disabled={rendering}>{rendering?'Preparing render…':'Render MP4'}</button>
  </section>
 }
