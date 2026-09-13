@@ -1,0 +1,29 @@
+/* The output frame stays stationary. Animate light within it, never its edges. */
+.editor-app .canvas{overflow:hidden;isolation:isolate;contain:paint;animation:none!important;filter:none!important}
+.editor-app .canvas::before,.editor-app .canvas::after{inset:0!important;width:auto!important;height:auto!important;transform:none!important;pointer-events:none!important;border:0!important;border-radius:0;clip-path:inset(0);animation:vg-light-motion 8s ease-in-out infinite alternate!important;background-size:140% 140%;background-position:30% 40%}
+.editor-app .effect-none::before,.editor-app .effect-none::after{display:none}
+.editor-app .effect-kaleidoscope::after{background:radial-gradient(ellipse at 20% 30%,#9765ff55,transparent 60%),radial-gradient(ellipse at 80% 70%,#ff659b44,transparent 65%);mix-blend-mode:screen}
+.editor-app .effect-film-burn::after{background:radial-gradient(ellipse at 0% 70%,#ff561888,transparent 65%),radial-gradient(ellipse at 100% 20%,#ffc96655,transparent 60%);mix-blend-mode:screen}
+.editor-app .effect-lens-flare::after{background:radial-gradient(ellipse at 70% 30%,#fff7dcb0,transparent 8%),radial-gradient(ellipse at 45% 50%,#faca6a30,transparent 25%),linear-gradient(175deg,transparent 46%,#fff2cf28 50%,transparent 54%);mix-blend-mode:screen}
+.editor-app .effect-glitch::after{animation:vg-scan-motion .45s steps(3) infinite!important}
+.editor-app .effect-rain::after{animation:vg-scan-motion 1s linear infinite!important}
+.editor-app .effect-grain::after,.editor-app .effect-noise::after{animation:vg-scan-motion .2s steps(2) infinite!important}
+@keyframes vg-light-motion{from{background-position:20% 25%}to{background-position:80% 75%}}
+@keyframes vg-scan-motion{from{background-position:0 0}to{background-position:12px 40px}}
+.editor-app .inspector-section{padding:16px 0;border-bottom:1px solid #343c31}
+.editor-app .inspector-section:has(.font-picker),.editor-app .text-style-controls,.editor-app .text-editor-live{display:none}
+.editor-app .inspector-section>label{font-size:12px;color:#b7c2af;line-height:1.5}
+.editor-app .inspector select,.editor-app .inspector input[type=number]{min-height:36px;border-radius:6px;background:#151b13;color:#ecf2e7;border:1px solid #46513d;padding:7px}
+.editor-app button:focus-visible,.editor-app input:focus-visible,.editor-app select:focus-visible,.editor-app textarea:focus-visible{outline:2px solid #d6ff3f;outline-offset:2px}
+.editor-app .spectrum-picker,.editor-app .font-picker{max-height:230px;overflow:auto;overscroll-behavior:contain;padding:3px}
+.editor-app .spectrum-picker button,.editor-app .font-picker button{min-height:36px;border-radius:5px;font-size:11px}
+.editor-app .layers-panel,.editor-app .inspector{scrollbar-width:thin;scrollbar-color:#56624c #1d211b;overscroll-behavior:contain}
+.editor-app .effect-sync-controls{flex-wrap:wrap;gap:8px}
+.editor-app .effect-sync-controls label{flex:1 1 65%}
+.editor-app .effect-sync-controls .effect-reactivity{flex-basis:100%}
+.editor-app .text-style-controls input[type=color]{width:100%;height:36px}
+.editor-app .canvas-title[style*="font-size"] strong{font-size:inherit}
+.editor-app .canvas-title[style*="font-weight"] strong{font-weight:inherit}
+.editor-app .font-picker+.color-line{display:none}
+@media(max-width:1100px){.editor-app{height:auto;min-height:100vh;overflow:auto}.editor-app .editor-body{grid-template-columns:54px minmax(260px,1fr) 280px;height:auto;min-height:calc(100vh - 64px)}.editor-app .layers-panel{grid-column:2;grid-row:2}.editor-app .canvas-area{grid-column:2;grid-row:1;min-height:65vh}.editor-app .inspector{position:static;transform:none!important;width:auto;grid-column:3;grid-row:1 / span 2;max-height:calc(100vh - 64px)}.editor-app .tool-rail{grid-row:1 / span 2}}
+@media(max-width:700px){.editor-app .editor-body{grid-template-columns:48px minmax(0,1fr)}.editor-app .inspector{grid-column:2;grid-row:3;max-height:none}.editor-app .layers-panel{display:block}.editor-app .canvas-stage{padding:16px}.editor-app .canvas{max-width:100%;min-height:0}.editor-app .editor-top{padding:0 10px}}
