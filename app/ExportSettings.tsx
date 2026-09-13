@@ -1,7 +1,8 @@
 'use client';
 import {useEffect,useState} from 'react';
 import {FFmpeg} from '@ffmpeg/ffmpeg';
-import {fetchFile,toBlobURL} from '@ffmpeg/util';
+import {fetchFile} from '@ffmpeg/util';
+const toBlobURL=async(url:string,_mime:string)=>url;
 export type ExportPreset={width:number;height:number;fps:24|30|60;quality:'standard'|'high'|'master';duration:number;format:'mp4'};
 export default function ExportSettings({onClose,audioDuration=0,onRender}:{onClose:()=>void;audioDuration?:number;onRender?:()=>void}){
  const [preset,setPreset]=useState<ExportPreset>({width:1080,height:1920,fps:30,quality:'high',duration:30,format:'mp4'});const [rendering,setRendering]=useState(false);const [message,setMessage]=useState('');const [detected,setDetected]=useState(audioDuration);const duration=detected||audioDuration;
