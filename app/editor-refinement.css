@@ -11,7 +11,11 @@
 @keyframes vg-light-motion{from{background-position:20% 25%}to{background-position:80% 75%}}
 @keyframes vg-scan-motion{from{background-position:0 0}to{background-position:12px 40px}}
 .editor-app .inspector-section{padding:16px 0;border-bottom:1px solid #343c31}
-.editor-app .inspector-section:has(.font-picker),.editor-app .text-style-controls,.editor-app .text-editor-live{display:none}
+.editor-app .inspector-section:has(.font-picker),.editor-app .text-style-controls{display:none}
+.editor-app .text-editor-live{display:block!important;padding:14px 16px!important;border:1px solid rgba(214,255,63,.28)!important;border-radius:14px!important;background:rgba(214,255,63,.045)!important}
+.editor-app .text-editor-live label{display:block!important;margin-bottom:8px!important;color:#d6ff3f!important;font-size:12px!important}
+.editor-app .text-editor-live textarea{display:block!important;width:100%!important;min-height:76px!important;resize:vertical!important;padding:12px!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:10px!important;background:#10150f!important;color:#fff!important;font:inherit!important;line-height:1.6!important;outline:none!important}
+.editor-app .text-editor-live textarea:focus{border-color:#d6ff3f!important;box-shadow:0 0 0 3px rgba(214,255,63,.12)!important}
 .editor-app .inspector-section>label{font-size:12px;color:#b7c2af;line-height:1.5}
 .editor-app .inspector select,.editor-app .inspector input[type=number]{min-height:36px;border-radius:6px;background:#151b13;color:#ecf2e7;border:1px solid #46513d;padding:7px}
 .editor-app button:focus-visible,.editor-app input:focus-visible,.editor-app select:focus-visible,.editor-app textarea:focus-visible{outline:2px solid #d6ff3f;outline-offset:2px}
