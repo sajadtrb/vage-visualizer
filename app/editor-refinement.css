@@ -1,4 +1,13 @@
 /* The output frame stays stationary. Animate light within it, never its edges. */
+.editor-app .canvas-object.cover{mix-blend-mode:normal;filter:none}
+.editor-app .canvas-background{filter:var(--background-filter,none);scale:var(--background-size,1);mix-blend-mode:normal}
+.editor-app video.canvas-background{inset:0;width:100%;height:100%;z-index:0;opacity:1;object-fit:cover}
+.editor-app .dream-background{position:absolute;inset:0;overflow:hidden;z-index:1;pointer-events:none;background:#283b44}
+.dream-background i{position:absolute;inset:-45%;border-radius:50%;opacity:.8;filter:blur(65px);animation:dream-loop var(--dream-time,16s) linear infinite;will-change:transform}
+.dream-background i:nth-child(2){inset:-30% -60% 0 20%;opacity:.75}
+.dream-background i:nth-child(3){inset:20% -25% -45% 10%;opacity:.65}
+@keyframes dream-loop{0%,100%{transform:translate(-12%,-8%) scale(.8)}25%{transform:translate(12%,-10%) scale(1)}50%{transform:translate(10%,12%) scale(.9)}75%{transform:translate(-10%,8%) scale(1.1)}}
+.background-tools{order:-1}.background-tools label{display:block;margin-top:14px}.background-tools p{font-size:12px;color:#aab79f}.background-tools button{padding:8px;color:#d6ff3f;background:#253020;border:1px solid #526047}.dream-colors{display:flex;gap:8px}.dream-colors input{width:48px;height:34px}
 .editor-app .canvas{overflow:hidden;isolation:isolate;contain:paint;animation:none!important;filter:none!important}
 .editor-app .canvas::before,.editor-app .canvas::after{inset:0!important;width:auto!important;height:auto!important;transform:none!important;pointer-events:none!important;border:0!important;border-radius:0;clip-path:inset(0);animation:vg-light-motion 8s ease-in-out infinite alternate!important;background-size:140% 140%;background-position:30% 40%}
 .editor-app .effect-none::before,.editor-app .effect-none::after{display:none}
@@ -11,7 +20,15 @@
 @keyframes vg-light-motion{from{background-position:20% 25%}to{background-position:80% 75%}}
 @keyframes vg-scan-motion{from{background-position:0 0}to{background-position:12px 40px}}
 .editor-app .inspector-section{padding:16px 0;border-bottom:1px solid #343c31}
-.editor-app .inspector-section:has(.font-picker),.editor-app .text-style-controls{display:none}
+.editor-app .text-style-controls{display:block!important}
+.editor-app .font-picker{display:grid!important}
+.editor-app .font-group{display:contents}
+.editor-app .font-group strong,.editor-app .font-group-heading{grid-column:1/-1;color:#d6ff3f;font-size:11px;padding:8px 2px 2px}
+.editor-app .text-toggle-row,.editor-app .text-direction-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+.editor-app .text-toggle-row button,.editor-app .text-direction-row button{padding:8px 4px;border:1px solid #46513d;background:#222a1d;color:#c7d1be;font-size:10px}
+.editor-app .text-toggle-row button:hover,.editor-app .text-direction-row button:hover{border-color:#d6ff3f;color:#d6ff3f}
+.editor-app .text-style-controls>label{display:block;margin-top:10px}
+.editor-app .text-colour-control{margin-top:12px}.editor-app .text-colour-control input{width:100%;height:36px;background:transparent;border:0}
 .editor-app .text-editor-live{display:block!important;padding:14px 16px!important;border:1px solid rgba(214,255,63,.28)!important;border-radius:14px!important;background:rgba(214,255,63,.045)!important}
 .editor-app .text-editor-live label{display:block!important;margin-bottom:8px!important;color:#d6ff3f!important;font-size:12px!important}
 .editor-app .text-editor-live textarea{display:block!important;width:100%!important;min-height:76px!important;resize:vertical!important;padding:12px!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:10px!important;background:#10150f!important;color:#fff!important;font:inherit!important;line-height:1.6!important;outline:none!important}
