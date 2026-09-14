@@ -1,0 +1,33 @@
+/* Keep controls grouped without moving React-owned DOM nodes. */
+.editor-app .inspector{display:flex;flex-direction:column;gap:10px;padding:14px;background:#141916}
+.editor-app .inspector>*{flex-shrink:0;order:20}
+.editor-app .inspector-tabs{order:0;position:sticky;top:-14px;z-index:5;background:#141916;padding:10px 0}
+.editor-app .inspector-section{padding:16px!important;border:1px solid #303c33!important;border-radius:12px;background:#1b221d;margin:0!important}
+.editor-app .inspector-section:has(h3){order:1}
+.editor-app .inspector-section:has(textarea){order:2}
+.editor-app .text-style-controls{order:3;display:flex;flex-direction:column}
+.editor-app .text-colour-control{display:flex;align-items:center;justify-content:space-between;padding:8px 0;order:-1}
+.editor-app .text-style-controls:has(.text-colour-control){display:flex!important;flex-direction:column}
+.editor-app .text-style-controls[style*="none"]{display:none!important}
+.editor-app .text-colour-control input[type=color]{width:64px;height:32px}
+.editor-app .inspector-section:has(.font-picker){order:4}
+.editor-app .inspector-section:has(.field-grid){order:5}
+.editor-app .layer-controls{order:6}
+.editor-app .inspector-section:has(.spectrum-picker){order:10}
+.editor-app .spectrum-colour-control{order:11}
+.editor-app .particle-controls{order:14}
+.editor-app #delete-layer{order:99;margin-top:12px;border-radius:8px}
+.editor-app .inspector label{font-size:12px;color:#b9c7bd;line-height:1.6}
+.editor-app .inspector input:not([type=range]):not([type=color]),.editor-app .inspector select,.editor-app .inspector textarea{background:#111813;color:#eff5f0;border:1px solid #425247;border-radius:7px;padding:9px;width:100%;box-sizing:border-box}
+.editor-app .font-picker{max-height:210px;overflow:auto;gap:6px}
+.editor-app .spectrum-picker{max-height:230px;overflow:auto;gap:6px}
+.editor-app .inspector button{border-radius:7px;min-height:32px}
+.editor-app .text-toggle-row,.editor-app .text-direction-row{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.export-modal{overflow:auto;padding:24px;box-sizing:border-box}
+.export-settings{width:min(600px,94vw)!important;max-height:90vh;overflow:auto;border-radius:16px;padding:26px!important;box-shadow:0 24px 90px #0008;direction:ltr}
+.export-settings>label{display:block;margin:14px 0!important;font-size:13px}
+.export-settings select,.export-settings input{padding:10px!important;margin-top:6px;border-radius:8px;font-size:14px!important;box-sizing:border-box;width:100%}
+.export-settings header{margin-bottom:16px!important}
+.export-settings p{font-size:12px!important;line-height:1.7;overflow-wrap:anywhere}
+.export-settings .export-render{padding:14px!important;font-size:16px!important;border-radius:8px}
+.export-status{white-space:pre-wrap}

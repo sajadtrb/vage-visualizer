@@ -1,4 +1,5 @@
 import './globals.css';
+import './studio-clean.css';
 import type {Metadata} from 'next';
 
 export const metadata: Metadata = {title: 'Vage Visualizer', description: 'Create audio-reactive visuals for your next release.'};
