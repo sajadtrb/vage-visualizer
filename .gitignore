@@ -3,3 +3,6 @@ node_modules/
 out/
 .vercel/
 *.log
+artifacts/
+baseline.png
+*.tsbuildinfo

@@ -1,0 +1,293 @@
+export type Kind =
+  "background" | "image" | "text" | "spectrum" | "particles" | "logo";
+export type Settings = Record<string, string | number | boolean>;
+export type Layer = {
+  id: string;
+  name: string;
+  kind: Kind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  rotation: number;
+  opacity: number;
+  visible: boolean;
+  locked: boolean;
+  asset?: string;
+  settings: Settings;
+};
+export type Project = {
+  version: 2;
+  id: string;
+  name: string;
+  updated: number;
+  width: number;
+  height: number;
+  layers: Layer[];
+  audio?: string;
+  audioName: string;
+  audioDuration: number;
+  start: number;
+  end: number;
+  loop: boolean;
+  effects: Settings;
+  export: {
+    fps: number;
+    quality: string;
+    width?: number;
+    height?: number;
+    start?: number;
+    end?: number;
+  };
+  thumbnail?: string;
+};
+export const spectra = [
+  "Pulse bars",
+  "Circular ring",
+  "Mirrored bars",
+  "Waveform",
+  "Oscilloscope",
+  "Neon ring",
+  "Liquid spectrum",
+  "Side spectrum",
+  "Dual bulb",
+  "Arc bars",
+  "Dot field",
+  "Aurora wave",
+  "Monstercat bars",
+  "Universe mesh",
+  "3D linebed",
+  "Hex rings",
+  "Pulse tunnel",
+  "Orbital dots",
+  "Radial wave",
+  "Frequency landscape",
+];
+export const particleStyles = [
+  "Soft dots",
+  "Star field",
+  "Network mesh",
+  "Nebula",
+  "Dust",
+  "Fireflies",
+  "Orbs",
+  "Bokeh",
+  "Wave particles",
+  "Radial particles",
+];
+export const effectStyles = [
+  "None",
+  "Film grain",
+  "Light leak",
+  "Lens flare",
+  "Chromatic aberration",
+  "RGB split",
+  "Glare",
+  "Bloom",
+  "Soft blur",
+  "Dream blur",
+  "VHS",
+  "Scanlines",
+  "Film burn",
+  "Dust",
+  "Scratches",
+  "Glitch",
+  "Pixel sorting",
+  "Strobe",
+  "Vignette",
+  "Color drift",
+  "Camera shake",
+  "Zoom pulse",
+  "Prism",
+  "Bokeh",
+  "Noise",
+  "Retro film",
+  "Analog distortion",
+];
+export const platforms = [
+  "Spotify",
+  "YouTube",
+  "Apple Music",
+  "SoundCloud",
+  "Deezer",
+  "Bandcamp",
+];
+export const uid = () => crypto.randomUUID();
+export const num = (s: Settings, k: string, f = 0) =>
+  typeof s[k] === "number" ? (s[k] as number) : f;
+export const str = (s: Settings, k: string, f = "") =>
+  typeof s[k] === "string" ? (s[k] as string) : f;
+export const clamp = (n: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, n));
+export function layer(kind: Kind, id: string): Layer {
+  const common = {
+    id,
+    name: kind[0].toUpperCase() + kind.slice(1),
+    kind,
+    x: 50,
+    y: 50,
+    w: 40,
+    h: 40,
+    rotation: 0,
+    opacity: 1,
+    visible: true,
+    locked: false,
+  };
+  const settings: Record<Kind, Settings> = {
+    background: {
+      mode: "Gradient",
+      color: "#111726",
+      color2: "#2f3653",
+      blur: 0,
+      brightness: 100,
+      contrast: 100,
+      saturation: 100,
+      hue: 0,
+      vignette: 0.25,
+      grain: 0,
+      overlay: "#677bff",
+      overlayOpacity: 0,
+      dream: false,
+      lightColor: "#8b82ff",
+      lightColor2: "#ff996e",
+      lightSize: 55,
+      lightBlur: 45,
+      lightIntensity: 0.5,
+      speed: 16,
+      videoStart: 0,
+      videoEnd: 0,
+      videoLoop: true,
+    },
+    image: { fit: "contain" },
+    text: {
+      text: "New text",
+      font: "Inter",
+      size: 64,
+      color: "#f8f9ff",
+      bold: false,
+      italic: false,
+      underline: false,
+      uppercase: false,
+      spacing: 0,
+      lineHeight: 1.2,
+      align: "center",
+      direction: "ltr",
+      shadow: 0,
+      glow: 0,
+      outline: 0,
+      outlineColor: "#000000",
+      background: false,
+      backgroundColor: "#111726",
+      padding: 12,
+      entrance: "None",
+      exit: "None",
+      duration: 1,
+      easing: "Ease out",
+    },
+    spectrum: {
+      style: "Pulse bars",
+      color: "#c2ff62",
+      color2: "#78dacc",
+      gradient: false,
+      gain: 1,
+      sensitivity: 1,
+      reaction: 1,
+      barWidth: 1,
+      bass: 1,
+      smoothing: 0.7,
+      minFrequency: 30,
+      maxFrequency: 16000,
+      count: 64,
+      thickness: 2,
+      gap: 0.25,
+      glow: 0,
+      mirror: false,
+      blend: "source-over",
+    },
+    particles: {
+      style: "Soft dots",
+      color: "#ffffff",
+      count: 100,
+      minSize: 0.2,
+      maxSize: 1.5,
+      glow: false,
+      glowIntensity: 6,
+      blur: 0,
+      speed: 0.25,
+      wind: false,
+      direction: "right",
+      strength: 0.5,
+      windReaction: 1,
+      random: 1,
+      reaction: 1,
+      bass: 1,
+      treble: 1,
+      spread: 1,
+      connections: false,
+      distance: 120,
+      connectionOpacity: 0.2,
+      seed: 42,
+    },
+    logo: { platform: "Spotify", style: "Original", color: "#ffffff" },
+  };
+  return {
+    ...common,
+    ...(kind === "background" || kind === "particles"
+      ? { w: 100, h: 100 }
+      : {}),
+    ...(kind === "text" ? { w: 75, h: 12 } : {}),
+    ...(kind === "logo" ? { w: 7, h: 7 } : {}),
+    settings: settings[kind],
+  };
+}
+export function freshProject(id: string): Project {
+  const bg = layer("background", "bg");
+  const spectrum = layer("spectrum", "spectrum");
+  spectrum.y = 64;
+  spectrum.w = 78;
+  spectrum.h = 21;
+  const title = layer("text", "title");
+  title.name = "Song title";
+  title.y = 82;
+  title.settings.text = "YOUR NEXT RELEASE";
+  title.settings.bold = true;
+  const artist = layer("text", "artist");
+  artist.name = "Artist name";
+  artist.y = 91;
+  artist.settings.text = "Artist name";
+  artist.settings.size = 28;
+  artist.settings.color = "#b4bace";
+  const particles = layer("particles", "particles");
+  particles.visible = false;
+  return {
+    version: 2,
+    id,
+    name: "Untitled session",
+    updated: 0,
+    width: 1920,
+    height: 1080,
+    layers: [bg, particles, spectrum, title, artist],
+    audioName: "",
+    audioDuration: 0,
+    start: 0,
+    end: 15,
+    loop: true,
+    effects: {
+      style: "None",
+      enabled: true,
+      intensity: 0.3,
+      speed: 1,
+      blend: 0.6,
+      sync: false,
+      reaction: 1,
+    },
+    export: { fps: 30, quality: "High" },
+  };
+}
+export function timeLabel(t: number) {
+  return `${Math.floor(t / 60)
+    .toString()
+    .padStart(2, "0")}:${Math.floor(t % 60)
+    .toString()
+    .padStart(2, "0")}`;
+}
