@@ -1,4 +1,4 @@
-import { Project } from "./model";
+import { Project, clamp } from "./model";
 import { AudioAnalysis } from "./audio";
 import { MediaLibrary } from "./media";
 import { renderScene, videoTime } from "./renderer";
@@ -124,13 +124,49 @@ export async function exportMP4(
     const canvas = document.createElement("canvas");
     canvas.width = width;
     canvas.height = height;
+    const renderCanvas = document.createElement("canvas");
     const scratch = document.createElement("canvas");
+    const outputContext = canvas.getContext("2d")!;
+    let renderScale = 1;
+    const resizeRenderSurface = (scale: number) => {
+      renderScale = scale;
+      // Keep the captured canvas at the requested export dimensions, while
+      // allowing the expensive scene raster to run at a measured, practical
+      // resolution. This is what preserves motion smoothness on 1080p scenes
+      // with video, blur, particles, and reactive effects enabled together.
+      renderCanvas.width = Math.max(2, Math.floor((width * scale) / 2) * 2);
+      renderCanvas.height = Math.max(2, Math.floor((height * scale) / 2) * 2);
+      scratch.width = renderCanvas.width;
+      scratch.height = renderCanvas.height;
+    };
+    resizeRenderSurface(1);
     await Promise.all(
       project.layers
         .filter((l) => l.asset && media.videos.has(l.asset))
         .map((l) => media.seek(l.asset!, videoTime(l, 0, media))),
     );
-    renderScene(canvas, scene, media, 0, analysis, scratch);
+    const paintFrame = (time: number) => {
+      renderScene(renderCanvas, scene, media, time, analysis, scratch);
+      outputContext.clearRect(0, 0, width, height);
+      outputContext.drawImage(renderCanvas, 0, 0, width, height);
+    };
+    const measureStart = performance.now();
+    paintFrame(0);
+    const firstFrameCost = performance.now() - measureStart;
+    if (firstFrameCost > 24) {
+      const qualityCap =
+        project.export.quality === "Standard"
+          ? 0.65
+          : project.export.quality === "High"
+            ? 0.8
+            : 1;
+      const adaptiveScale = clamp(Math.sqrt(24 / firstFrameCost), 0.35, 1);
+      const nextScale = Math.min(qualityCap, adaptiveScale);
+      if (nextScale < 0.92) {
+        resizeRenderSurface(nextScale);
+        paintFrame(0);
+      }
+    }
     // Explicit frame requests prevent CanvasCaptureMediaStreamTrack from
     // inheriting the browser's best-effort paint rate. On heavy compositions
     // that otherwise becomes a variable-rate recording (for example ~6.7fps
@@ -223,7 +259,7 @@ export async function exportMP4(
                   if (v.paused && v.loop) v.play().catch(reject);
                 }
               });
-              renderScene(canvas, scene, media, t, analysis, scratch);
+              paintFrame(t);
               requestCapturedFrame?.();
               send(
                 (t / duration) * (native ? 98 : 80),
