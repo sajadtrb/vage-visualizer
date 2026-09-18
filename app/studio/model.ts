@@ -324,6 +324,17 @@ export function resizeProjectCanvas(
   });
   return { ...p, width: nextWidth, height: nextHeight, layers };
 }
+export function normalizeProject(p: Project): Project {
+  return {
+    ...p,
+    version: 2,
+    layers: p.layers.map((l) =>
+      l.kind === "background" || l.kind === "particles"
+        ? { ...l, x: 50, y: 50, w: 100, h: 100 }
+        : l,
+    ),
+  };
+}
 export function timeLabel(t: number) {
   return `${Math.floor(t / 60)
     .toString()

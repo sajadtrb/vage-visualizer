@@ -29,6 +29,7 @@ Import media -> edit typed layers -> preview using the shared renderer -> persis
 - Export cancellation, invalid-dimension error, correction, and retry pass. Errors remain visible inside the dialog. No application page errors in the final workflow and edge-case test runs.
 - Canvas resizing now applies one uniform fit transform to layer geometry and text size; full-canvas background/particle layers remain full bleed. Browser verification confirmed editable Custom canvas dimensions (1280 × 720) with no page errors.
 - Imported image layers now retain their intrinsic aspect ratio when Width/Height is edited or resized with handles; the ratio is stored with the asset so it remains reliable after reopening. Text box resizing no longer silently changes font size.
+- The stage no longer uses a percentage-based max-height that could override its aspect ratio when the browser window changed size. It now keeps the project ratio at all tested viewports (1920×900, 1200×700, and 800×900), and legacy full-bleed Background/Particles geometry is normalized on load and update.
 
 ## Important boundaries
 

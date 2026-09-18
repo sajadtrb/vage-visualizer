@@ -821,11 +821,15 @@ export function renderScene(
     ...p.layers.filter((l) => l.kind !== "background"),
   ]) {
     if (!l.visible || l.opacity <= 0) continue;
-    const w = (l.w / 100) * p.width,
-      h = (l.h / 100) * p.height;
+    const fullBleed = l.kind === "background" || l.kind === "particles";
+    const w = fullBleed ? p.width : (l.w / 100) * p.width,
+      h = fullBleed ? p.height : (l.h / 100) * p.height;
     c.save();
     c.globalAlpha = l.opacity;
-    c.translate((l.x / 100) * p.width, (l.y / 100) * p.height);
+    c.translate(
+      fullBleed ? p.width / 2 : (l.x / 100) * p.width,
+      fullBleed ? p.height / 2 : (l.y / 100) * p.height,
+    );
     c.rotate((l.rotation * Math.PI) / 180);
     c.translate(-w / 2, -h / 2);
     if (l.kind === "background") background(c, l, w, h, time, media);

@@ -10,6 +10,7 @@ import {
   clamp,
   freshProject,
   layer,
+  normalizeProject,
   resizeProjectCanvas,
   timeLabel,
   uid,
@@ -159,7 +160,7 @@ export default function Studio() {
       if (history.current.length > 80) history.current.shift();
       future.current = [];
     }
-    const next = { ...fn(previous), updated: Date.now() };
+    const next = normalizeProject({ ...fn(previous), updated: Date.now() });
     next.layers = [
       ...next.layers.filter((l) => l.kind === "background"),
       ...next.layers.filter((l) => l.kind !== "background"),
@@ -250,7 +251,11 @@ export default function Studio() {
         const id = await getActive();
         const stored = id ? await getProject(id) : undefined;
         if (active)
-          setProject(stored?.version === 2 ? stored : freshProject(uid()));
+          setProject(
+            stored?.version === 2
+              ? normalizeProject(stored)
+              : freshProject(uid()),
+          );
       } catch (e) {
         if (active) {
           setProject(freshProject(uid()));
@@ -1233,10 +1238,10 @@ export default function Studio() {
                       className={`layer-hit ${selected.includes(l.id) ? "is-selected" : ""}`}
                       aria-label={l.name}
                       style={{
-                        left: `${l.x}%`,
-                        top: `${l.y}%`,
-                        width: `${l.w}%`,
-                        height: `${l.h}%`,
+                        left: `${l.kind === "background" || l.kind === "particles" ? 50 : l.x}%`,
+                        top: `${l.kind === "background" || l.kind === "particles" ? 50 : l.y}%`,
+                        width: `${l.kind === "background" || l.kind === "particles" ? 100 : l.w}%`,
+                        height: `${l.kind === "background" || l.kind === "particles" ? 100 : l.h}%`,
                         transform: `translate(-50%,-50%) rotate(${l.rotation}deg)`,
                         pointerEvents:
                           l.kind === "background" || l.kind === "particles"
