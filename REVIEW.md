@@ -27,6 +27,7 @@ Import media -> edit typed layers -> preview using the shared renderer -> persis
 - Full 181-second native export repeated on the final production build: 129,233,677 bytes. Browser-decoded duration 180.934333 seconds and dimensions 1920 × 1080. Real-time recorder timing is approximate, as noted below.
 - Compatibility MP4: the initial test found webpack rewriting the encoder worker's dynamic core import. Serving the upstream worker as a local ESM asset fixed it. Re-tested using the actual Compatibility encoder checkbox against the final production build: two-second MP4 downloaded successfully (119,334 bytes).
 - Export cancellation, invalid-dimension error, correction, and retry pass. Errors remain visible inside the dialog. No application page errors in the final workflow and edge-case test runs.
+- Canvas resizing now applies one uniform fit transform to layer geometry and text size; full-canvas background/particle layers remain full bleed. Browser verification confirmed editable Custom canvas dimensions (1280 × 720) with no page errors.
 
 ## Important boundaries
 

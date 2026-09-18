@@ -284,6 +284,46 @@ export function freshProject(id: string): Project {
     export: { fps: 30, quality: "High" },
   };
 }
+
+/**
+ * Changes the project format without independently stretching the scene on
+ * each axis. The scene is uniformly fitted into the new canvas, preserving
+ * the proportions of every object and the pixel size of typography.
+ */
+export function resizeProjectCanvas(
+  p: Project,
+  width: number,
+  height: number,
+): Project {
+  const nextWidth = Math.round(clamp(width, 64, 3840));
+  const nextHeight = Math.round(clamp(height, 64, 3840));
+  if (p.width === nextWidth && p.height === nextHeight) return p;
+  const factor = Math.min(nextWidth / p.width, nextHeight / p.height);
+  const offsetX = (nextWidth - p.width * factor) / 2;
+  const offsetY = (nextHeight - p.height * factor) / 2;
+  const layers = p.layers.map((l) => {
+    // Full-canvas layers must remain full-canvas; they are not letterboxed.
+    if (l.kind === "background" || l.kind === "particles")
+      return { ...l, x: 50, y: 50, w: 100, h: 100 };
+    const px = (l.x / 100) * p.width;
+    const py = (l.y / 100) * p.height;
+    const pw = (l.w / 100) * p.width;
+    const ph = (l.h / 100) * p.height;
+    const settings =
+      l.kind === "text" && typeof l.settings.size === "number"
+        ? { ...l.settings, size: Math.max(1, l.settings.size * factor) }
+        : l.settings;
+    return {
+      ...l,
+      x: ((px * factor + offsetX) / nextWidth) * 100,
+      y: ((py * factor + offsetY) / nextHeight) * 100,
+      w: (pw * factor * 100) / nextWidth,
+      h: (ph * factor * 100) / nextHeight,
+      settings,
+    };
+  });
+  return { ...p, width: nextWidth, height: nextHeight, layers };
+}
 export function timeLabel(t: number) {
   return `${Math.floor(t / 60)
     .toString()

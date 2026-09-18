@@ -10,6 +10,7 @@ import {
   clamp,
   freshProject,
   layer,
+  resizeProjectCanvas,
   timeLabel,
   uid,
 } from "./model";
@@ -116,7 +117,11 @@ export default function Studio() {
     [showProjects, setShowProjects] = useState(false),
     [projects, setProjects] = useState<Project[]>([]),
     [showExport, setShowExport] = useState(false),
-    [inspectorTab, setInspectorTab] = useState("Layer");
+    [inspectorTab, setInspectorTab] = useState("Layer"),
+    [customCanvas, setCustomCanvas] = useState({
+      width: "1280",
+      height: "720",
+    });
   const canvas = useRef<HTMLCanvasElement>(null),
     surface = useRef<HTMLDivElement>(null),
     scratch = useRef<HTMLCanvasElement | null>(null),
@@ -144,6 +149,9 @@ export default function Studio() {
     [lang],
   );
   const selectedLayer = project.layers.find((l) => l.id === selected[0]);
+  const canvasIsPreset = ["1920x1080", "1080x1920", "1080x1080"].includes(
+    `${project.width}x${project.height}`,
+  );
   const update = (fn: (p: Project) => Project, remember = true) => {
     const previous = live.current;
     if (remember) {
@@ -225,6 +233,13 @@ export default function Studio() {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";
   }, [lang]);
+  useEffect(() => {
+    if (!canvasIsPreset)
+      setCustomCanvas({
+        width: String(project.width),
+        height: String(project.height),
+      });
+  }, [canvasIsPreset, project.width, project.height]);
   useEffect(() => {
     if (!ready) return;
     const timer = setTimeout(() => {
@@ -798,6 +813,9 @@ export default function Studio() {
     }));
     setTab("Layers");
   };
+  const changeCanvas = (width: number, height: number) => {
+    update((p) => resizeProjectCanvas(p, width, height));
+  };
   const logoRow = () => {
     const list = Object.keys(logos)
       .slice(0, 5)
@@ -1059,16 +1077,79 @@ export default function Studio() {
               <span className="eyebrow">{t("Canvas")}</span>
               <select
                 aria-label="Canvas format"
-                value={`${project.width}x${project.height}`}
+                value={
+                  canvasIsPreset
+                    ? `${project.width}x${project.height}`
+                    : "custom"
+                }
                 onChange={(e) => {
+                  if (e.target.value === "custom") {
+                    // Enter custom mode with a useful editable starting size.
+                    setCustomCanvas({ width: "1280", height: "720" });
+                    changeCanvas(1280, 720);
+                    return;
+                  }
                   const [w, h] = e.target.value.split("x").map(Number);
-                  update((p) => ({ ...p, width: w, height: h }));
+                  changeCanvas(w, h);
                 }}
               >
                 <option value="1920x1080">YouTube · 16:9</option>
                 <option value="1080x1920">Reel / Story · 9:16</option>
                 <option value="1080x1080">Square · 1:1</option>
+                <option value="custom">Custom canvas…</option>
               </select>
+              {!canvasIsPreset && (
+                <div
+                  className="custom-canvas-fields"
+                  aria-label="Custom canvas size"
+                >
+                  <label>
+                    W
+                    <input
+                      aria-label="Canvas width"
+                      type="number"
+                      min={64}
+                      max={3840}
+                      step={2}
+                      value={customCanvas.width}
+                      onChange={(e) =>
+                        setCustomCanvas((v) => ({
+                          ...v,
+                          width: e.target.value,
+                        }))
+                      }
+                      onBlur={() => {
+                        const width = Number(customCanvas.width);
+                        if (Number.isFinite(width))
+                          changeCanvas(width, project.height);
+                      }}
+                    />
+                  </label>
+                  <span>×</span>
+                  <label>
+                    H
+                    <input
+                      aria-label="Canvas height"
+                      type="number"
+                      min={64}
+                      max={3840}
+                      step={2}
+                      value={customCanvas.height}
+                      onChange={(e) =>
+                        setCustomCanvas((v) => ({
+                          ...v,
+                          height: e.target.value,
+                        }))
+                      }
+                      onBlur={() => {
+                        const height = Number(customCanvas.height);
+                        if (Number.isFinite(height))
+                          changeCanvas(project.width, height);
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
             </div>
             <div className="zoom-tools">
               <button

@@ -19,6 +19,7 @@ Open http://localhost:3000. Use the same browser and port to access saved projec
 - Shift-click layers to select more than one. Arrow keys nudge, Shift-arrow moves farther. Delete removes selected unlocked layers. Ctrl/Cmd-Z undoes; Shift-Ctrl/Cmd-Z redoes.
 - Particle color, spectrum color and text color are separate. Particles start hidden, using Soft dots. Use the visibility button in Layers to enable them.
 - Background filters only affect the background. Global effects live in the Effects tab.
+- Canvas formats include YouTube 16:9, Reel/Story 9:16, Square 1:1, and Custom dimensions. Switching formats uniformly fits the composition so layers and typography keep their proportions instead of stretching.
 - Projects autosave, including imported blobs. The project library supports open, rename, duplicate and confirmed deletion. Browser storage can still be removed by clearing site data: this is local storage, not a cloud backup.
 
 ## Export
