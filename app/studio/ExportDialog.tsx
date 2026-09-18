@@ -25,7 +25,11 @@ export default function ExportDialog({
     [end, setEnd] = useState(project.export.end ?? project.end),
     [progress, setProgress] = useState<Progress | null>(null),
     [busy, setBusy] = useState(false),
-    [compatibility, setCompatibility] = useState(false),
+    // The browser-native recorder can silently produce a variable/very low
+    // frame-rate MP4 when a scene is expensive to render. Keep the constant
+    // frame-rate encoder enabled by default so downloaded files match the
+    // selected FPS instead of the browser's rendering throughput.
+    [compatibility, setCompatibility] = useState(true),
     [error, setError] = useState(""),
     [url, setUrl] = useState("");
   const abort = useRef<AbortController | null>(null),
@@ -206,7 +210,7 @@ export default function ExportDialog({
         </button>
       </fieldset>
       <label className="toggle-field field">
-        <span>{t("Compatibility encoder (slower)")}</span>
+        <span>{t("Constant frame-rate encoder (recommended)")}</span>
         <input
           aria-label="Compatibility encoder"
           type="checkbox"

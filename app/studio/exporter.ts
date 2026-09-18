@@ -131,7 +131,21 @@ export async function exportMP4(
         .map((l) => media.seek(l.asset!, videoTime(l, 0, media))),
     );
     renderScene(canvas, scene, media, 0, analysis, scratch);
-    stream = canvas.captureStream(project.export.fps);
+    // Explicit frame requests prevent CanvasCaptureMediaStreamTrack from
+    // inheriting the browser's best-effort paint rate. On heavy compositions
+    // that otherwise becomes a variable-rate recording (for example ~6.7fps
+    // even though the export was configured for 30fps).
+    const explicitCapture = canvas.captureStream(0);
+    const explicitTrack = explicitCapture.getVideoTracks()[0] as
+      | (CanvasCaptureMediaStreamTrack & { requestFrame?: () => void })
+      | undefined;
+    const requestCapturedFrame = explicitTrack?.requestFrame
+      ? () => explicitTrack.requestFrame!()
+      : undefined;
+    stream = requestCapturedFrame
+      ? explicitCapture
+      : canvas.captureStream(project.export.fps);
+    if (!requestCapturedFrame) explicitCapture.getTracks().forEach((t) => t.stop());
     let source: AudioBufferSourceNode | undefined;
     if (analysis) {
       context = new AudioContext();
@@ -172,8 +186,9 @@ export async function exportMP4(
             ),
           );
         recorder!.onstop = () => resolve();
-        let last = 0;
         const begin = performance.now();
+        const frameInterval = 1000 / project.export.fps;
+        let nextFrameAt = begin;
         recorder!.start(1000);
         source?.start(
           0,
@@ -198,8 +213,7 @@ export async function exportMP4(
               recorder!.stop();
               return;
             }
-            if (now - last >= 1000 / project.export.fps) {
-              last = now;
+            if (now + 0.5 >= nextFrameAt) {
               project.layers.forEach((l) => {
                 const v = l.asset ? media.videos.get(l.asset) : undefined;
                 if (v) {
@@ -210,10 +224,16 @@ export async function exportMP4(
                 }
               });
               renderScene(canvas, scene, media, t, analysis, scratch);
+              requestCapturedFrame?.();
               send(
                 (t / duration) * (native ? 98 : 80),
                 Math.max(0, duration - t),
               );
+              // Keep the schedule tied to the export clock. Advancing from
+              // `now` would turn every slow render into a new, slower FPS.
+              do {
+                nextFrameAt += frameInterval;
+              } while (nextFrameAt <= now);
             }
             animation = requestAnimationFrame(tick);
           } catch (e) {
@@ -259,6 +279,14 @@ export async function exportMP4(
         ffmpeg.exec([
           "-i",
           "in.webm",
+          "-map",
+          "0:v:0",
+          "-map",
+          "0:a?",
+          "-r",
+          String(project.export.fps),
+          "-fps_mode",
+          "cfr",
           "-c:v",
           "libx264",
           "-preset",
@@ -273,6 +301,7 @@ export async function exportMP4(
           "aac",
           "-pix_fmt",
           "yuv420p",
+          "-shortest",
           "-movflags",
           "+faststart",
           "out.mp4",

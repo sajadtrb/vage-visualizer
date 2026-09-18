@@ -1,5 +1,6 @@
 export const fa: Record<string, string> = {
   "Compatibility encoder (slower)": "مبدل سازگارتر (کندتر)",
+  "Constant frame-rate encoder (recommended)": "رمزگذار نرخ فریم ثابت (پیشنهادی)",
   "Bar width": "پهنای ستون‌ها",
   Projects: "پروژه‌ها",
   Save: "ذخیره",
