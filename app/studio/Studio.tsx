@@ -176,6 +176,41 @@ export default function Studio() {
       }),
       remember,
     );
+  const patchLayerDimension = (id: string, key: "w" | "h", value: number) => {
+    const current = live.current.layers.find((l) => l.id === id);
+    if (!current || !Number.isFinite(value)) return;
+    const safe = clamp(value, 0.1, 400);
+    if (current.kind !== "image" && current.kind !== "logo") {
+      patchLayer(id, { [key]: safe });
+      return;
+    }
+    const aspect =
+      current.kind === "logo"
+        ? 1
+        : (() => {
+            const storedAspect = current.settings.aspect;
+            if (typeof storedAspect === "number" && storedAspect > 0)
+              return storedAspect;
+            const image = current.asset
+              ? media.current.images.get(current.asset)
+              : undefined;
+            return image?.naturalWidth && image.naturalHeight
+              ? image.naturalWidth / image.naturalHeight
+              : (current.w * live.current.width) /
+                  (current.h * live.current.height);
+          })();
+    const patch =
+      key === "w"
+        ? {
+            w: safe,
+            h: (safe * live.current.width) / (aspect * live.current.height),
+          }
+        : {
+            h: safe,
+            w: (safe * aspect * live.current.height) / live.current.width,
+          };
+    patchLayer(id, patch);
+  };
   const settings = (patch: Settings) => {
     if (selectedLayer)
       patchLayer(selectedLayer.id, {
@@ -498,6 +533,10 @@ export default function Studio() {
           add("image", {
             name: kind === "cover" ? "Cover art" : file.name,
             asset: id,
+            settings: {
+              ...layer("image", id).settings,
+              aspect: img.naturalWidth / img.naturalHeight,
+            },
             w: w * Math.min(1, 80 / h),
             h: Math.min(80, h),
             y: kind === "cover" ? 34 : 50,
@@ -729,7 +768,8 @@ export default function Studio() {
         sy = d.corner < 2 ? -1 : 1;
       const nw = Math.max(1, l.w + ((2 * lx) / project.width) * 100 * sx),
         nh = Math.max(1, l.h + ((2 * ly) / project.height) * 100 * sy);
-      if (e.altKey) patch = { w: nw, h: nh };
+      if (e.altKey && l.kind !== "image" && l.kind !== "logo")
+        patch = { w: nw, h: nh };
       else {
         const factor = Math.max(
           0.05,
@@ -738,11 +778,6 @@ export default function Studio() {
         patch = { w: l.w * factor, h: l.h * factor };
       }
     }
-    if (d.mode === "scale" && l.kind === "text" && patch.w)
-      patch.settings = {
-        ...l.settings,
-        size: (Number(l.settings.size) * patch.w) / l.w,
-      };
     patchLayer(l.id, patch, false);
   };
   const finish = () => {
@@ -1451,12 +1486,15 @@ export default function Studio() {
                         step={0.1}
                         value={Math.round(selectedLayer[key] * 100) / 100}
                         onChange={(e) =>
-                          patchLayer(selectedLayer.id, {
-                            [key]:
-                              key === "w" || key === "h"
-                                ? clamp(+e.target.value, 0.1, 400)
-                                : +e.target.value,
-                          })
+                          key === "w" || key === "h"
+                            ? patchLayerDimension(
+                                selectedLayer.id,
+                                key,
+                                +e.target.value,
+                              )
+                            : patchLayer(selectedLayer.id, {
+                                [key]: +e.target.value,
+                              })
                         }
                       />
                     </label>
