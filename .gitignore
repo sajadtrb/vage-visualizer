@@ -6,3 +6,6 @@ out/
 artifacts/
 baseline.png
 *.tsbuildinfo
+
+.vercel
+.env*

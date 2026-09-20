@@ -100,7 +100,7 @@ type Drag = {
   bounds: DOMRect;
   corner: number;
 };
-export default function Studio() {
+export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
   const [project, setProject] = useState<Project>(() =>
     freshProject("initial"),
   );
@@ -916,6 +916,7 @@ export default function Studio() {
           >
             {lang === "en" ? "فارسی" : "EN"}
           </button>
+          {onSignOut && <button onClick={onSignOut}>{t("Sign out")}</button>}
           <button
             className="primary-button"
             onClick={() => {

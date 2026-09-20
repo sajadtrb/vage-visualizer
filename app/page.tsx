@@ -1,4 +1,4 @@
-import Studio from "./studio/Studio";
+import StudioEntry from "./studio/StudioEntry";
 export default function Page() {
-  return <Studio />;
+  return <StudioEntry />;
 }

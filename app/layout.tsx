@@ -1,9 +1,10 @@
 import "./studio/studio.css";
+import "./studio/entry.css";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Vage Visualizer",
-  description: "Create audio-reactive visuals for your next release.",
+  title: "Vage Content Studio",
+  description: "Create audio-reactive visuals for every platform.",
 };
 export default function RootLayout({
   children,
