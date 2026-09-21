@@ -41,7 +41,7 @@ export default function StudioEntry() {
       active = false;
       data.subscription.unsubscribe();
     };
-  }, [client]);
+  }, []);
 
   if (!ready) return <div className="studio-entry-loading">Loading Studio…</div>;
   if (session || localPreview) {
