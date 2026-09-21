@@ -48,7 +48,8 @@ export function getStudioAuthClient() {
     async getSession() { return { data: { session: storedSession() } }; },
     onAuthStateChange(listener: Listener) { listeners.add(listener); return { data: { subscription: { unsubscribe: () => listeners.delete(listener) } } }; },
     async signUp({ email, password, options }: { email: string; password: string; options?: { data?: Record<string, unknown> } }) {
-      const payload = await authRequest("/signup", { email, password, data: options?.data || {} });
+      const redirect = typeof window !== "undefined" ? `?redirect_to=${encodeURIComponent(window.location.origin)}` : "";
+      const payload = await authRequest(`/signup${redirect}`, { email, password, data: options?.data || {} });
       const session = sessionFromPayload(payload); if (session) setStoredSession(session, "SIGNED_IN");
       return { data: { session, user: (payload.user as StudioUser | undefined) || null }, error: null };
     },
