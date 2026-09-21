@@ -11,6 +11,7 @@ export type StudioSession = { access_token: string; refresh_token?: string; expi
 type AuthEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED";
 type Listener = (event: AuthEvent, session: StudioSession | null) => void;
 const listeners = new Set<Listener>();
+let refreshInFlight: Promise<StudioSession | null> | null = null;
 
 function storedSession() {
   if (typeof window === "undefined") return null;
@@ -27,6 +28,37 @@ function setStoredSession(session: StudioSession | null, event: AuthEvent) {
     else localStorage.removeItem(storageKey);
   }
   listeners.forEach((listener) => listener(event, session));
+}
+
+async function refreshStoredSession() {
+  const current = storedSession();
+  if (!current?.refresh_token || !url || !key) return current;
+  if (current.expires_at && current.expires_at > Math.floor(Date.now() / 1000) + 90)
+    return current;
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = authRequest("/token?grant_type=refresh_token", {
+    refresh_token: current.refresh_token,
+  })
+    .then((payload) => {
+      const next = sessionFromPayload(payload);
+      if (!next) throw new Error("The authentication service returned no refreshed session.");
+      setStoredSession(next, "TOKEN_REFRESHED");
+      return next;
+    })
+    .catch(() => {
+      // A refresh token can be revoked. Remove the stale session so the entry
+      // screen can ask the user to sign in again instead of looping on 401s.
+      setStoredSession(null, "SIGNED_OUT");
+      return null;
+    })
+    .finally(() => {
+      refreshInFlight = null;
+    });
+  return refreshInFlight;
+}
+
+export async function refreshStudioSession() {
+  return refreshStoredSession();
 }
 
 async function authRequest(path: string, body: Record<string, unknown>) {
@@ -49,7 +81,7 @@ function sessionFromPayload(payload: Record<string, unknown>) {
 export function getStudioAuthClient() {
   if (!studioAuthConfigured) return null;
   return { auth: {
-    async getSession() { return { data: { session: storedSession() } }; },
+    async getSession() { return { data: { session: await refreshStoredSession() } }; },
     onAuthStateChange(listener: Listener) { listeners.add(listener); return { data: { subscription: { unsubscribe: () => listeners.delete(listener) } } }; },
     async signUp({ email, password, options }: { email: string; password: string; options?: { data?: Record<string, unknown> } }) {
       const redirect = typeof window !== "undefined" ? `?redirect_to=${encodeURIComponent(window.location.origin)}` : "";

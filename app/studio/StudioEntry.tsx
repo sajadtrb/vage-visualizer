@@ -35,12 +35,16 @@ export default function StudioEntry() {
       setSession(data.session);
       setReady(true);
     });
+    const refreshTimer = window.setInterval(() => {
+      void nextClient.auth.getSession();
+    }, 60_000);
     const { data } = nextClient.auth.onAuthStateChange((_event, next) => {
       setSession(next);
       setReady(true);
     });
     return () => {
       active = false;
+      window.clearInterval(refreshTimer);
       data.subscription.unsubscribe();
     };
   }, []);

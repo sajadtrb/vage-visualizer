@@ -1,6 +1,6 @@
 "use client";
 
-import { getStoredStudioSession, type StudioSession } from "./studioAuth";
+import { getStoredStudioSession, refreshStudioSession, type StudioSession } from "./studioAuth";
 
 const baseUrl = process.env.NEXT_PUBLIC_STUDIO_SUPABASE_URL?.replace(/\/$/, "");
 const publishableKey = process.env.NEXT_PUBLIC_STUDIO_SUPABASE_ANON_KEY;
@@ -35,6 +35,19 @@ export type StudioSubscription = {
   created_at: string;
 };
 
+export type StudioPaymentEvent = {
+  id: string;
+  user_id: string | null;
+  subscription_id: string | null;
+  gateway: string;
+  status: "created" | "redirected" | "verified" | "failed";
+  amount_toman: number;
+  client_ref_id: string;
+  gateway_ref_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type StudioPlan = {
   code: Exclude<PlanCode, "free" | "unlimited">;
   title: string;
@@ -60,12 +73,17 @@ function authHeaders(session: StudioSession, extra: Record<string, string> = {})
 }
 
 async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const session = getStoredStudioSession();
+  let session = getStoredStudioSession();
   if (!session) throw new Error("Sign in to access your Studio account.");
-  const response = await fetch(`${baseUrl}/rest/v1${path}`, {
+  const request = (current: StudioSession) => fetch(`${baseUrl}/rest/v1${path}`, {
     ...init,
-    headers: authHeaders(session, (init.headers || {}) as Record<string, string>),
+    headers: authHeaders(current, (init.headers || {}) as Record<string, string>),
   });
+  let response = await request(session);
+  if (response.status === 401 && session.refresh_token) {
+    session = await refreshStudioSession();
+    if (session) response = await request(session);
+  }
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
     const message = payload?.message || payload?.hint || payload?.details || "Studio data request failed.";
@@ -111,6 +129,12 @@ export async function listSubscriptions() {
   return rest<StudioSubscription[]>(`/studio_subscriptions?user_id=eq.${encodeURIComponent(session.user.id)}&select=*&order=created_at.desc`);
 }
 
+export async function listPaymentEvents() {
+  const session = getStoredStudioSession();
+  if (!session) return [];
+  return rest<StudioPaymentEvent[]>(`/studio_payment_events?user_id=eq.${encodeURIComponent(session.user.id)}&select=*&order=created_at.desc&limit=20`);
+}
+
 export async function reserveStudioRender() {
   return rest<{ granted: boolean; remaining: number | null; mode: AccessMode }>("/rpc/reserve_studio_render", {
     method: "POST",
@@ -122,7 +146,7 @@ export async function listAdminProfiles() {
   return rest<StudioProfile[]>("/studio_profiles?select=*&order=created_at.desc");
 }
 
-export async function updateAdminProfile(userId: string, patch: Partial<Pick<StudioProfile, "plan_code" | "access_mode" | "render_limit" | "display_name">>) {
+export async function updateAdminProfile(userId: string, patch: Partial<Pick<StudioProfile, "plan_code" | "access_mode" | "render_limit" | "display_name" | "renders_used_week">>) {
   const rows = await rest<StudioProfile[]>(`/studio_profiles?user_id=eq.${encodeURIComponent(userId)}`, {
     method: "PATCH",
     headers: { Prefer: "return=representation" },
