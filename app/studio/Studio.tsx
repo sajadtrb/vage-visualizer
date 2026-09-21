@@ -749,11 +749,17 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
     if (!d) return;
     const l = d.initial;
     let patch: Partial<Layer> = {};
-    if (d.mode === "move")
-      patch = {
-        x: l.x + ((e.clientX - d.px) / d.bounds.width) * 100,
-        y: l.y + ((e.clientY - d.py) / d.bounds.height) * 100,
-      };
+    if (d.mode === "move") {
+      const nextX = l.x + ((e.clientX - d.px) / d.bounds.width) * 100;
+      const nextY = l.y + ((e.clientY - d.py) / d.bounds.height) * 100;
+      const center = (value: number, size: number) =>
+        l.kind === "background"
+          ? clamp(value, 0, 100)
+          : size >= 100
+            ? 50
+            : clamp(value, size / 2, 100 - size / 2);
+      patch = { x: center(nextX, l.w), y: center(nextY, l.h) };
+    }
     else if (d.mode === "rotate") {
       const cx = d.bounds.left + (d.bounds.width * l.x) / 100,
         cy = d.bounds.top + (d.bounds.height * l.y) / 100;
@@ -775,8 +781,17 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
         ly = dx * Math.sin(a) + dy * Math.cos(a);
       const sx = d.corner === 0 || d.corner === 3 ? -1 : 1,
         sy = d.corner < 2 ? -1 : 1;
-      const nw = Math.max(1, l.w + ((2 * lx) / project.width) * 100 * sx),
-        nh = Math.max(1, l.h + ((2 * ly) / project.height) * 100 * sy);
+      const maxDimension = l.kind === "background" ? 200 : 100;
+      const nw = clamp(
+          l.w + ((2 * lx) / project.width) * 100 * sx,
+          0.1,
+          maxDimension,
+        ),
+        nh = clamp(
+          l.h + ((2 * ly) / project.height) * 100 * sy,
+          0.1,
+          maxDimension,
+        );
       if (e.altKey && l.kind !== "image" && l.kind !== "logo")
         patch = { w: nw, h: nh };
       else {
@@ -784,7 +799,29 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
           0.05,
           Math.abs(nw - l.w) > Math.abs(nh - l.h) ? nw / l.w : nh / l.h,
         );
-        patch = { w: l.w * factor, h: l.h * factor };
+        patch = {
+          w: clamp(l.w * factor, 0.1, maxDimension),
+          h: clamp(l.h * factor, 0.1, maxDimension),
+        };
+        // A text layer is drawn in canvas pixels, so changing only its box
+        // leaves the glyphs at the old size. Scale its typography together
+        // with the transform while keeping every text layer independent.
+        if (l.kind === "text") {
+          const scaleSetting = (key: string, fallback = 0) => {
+            const value = l.settings[key];
+            return typeof value === "number" ? value : fallback;
+          };
+          patch.settings = {
+            ...l.settings,
+            size: Math.max(1, scaleSetting("size", 64) * factor),
+            spacing: scaleSetting("spacing") * factor,
+            padding: Math.max(0, scaleSetting("padding", 12) * factor),
+            lineHeight: Math.max(0.5, scaleSetting("lineHeight", 1.2)),
+            shadow: scaleSetting("shadow") * factor,
+            glow: scaleSetting("glow") * factor,
+            outline: scaleSetting("outline") * factor,
+          };
+        }
       }
     }
     patchLayer(l.id, patch, false);
@@ -1244,13 +1281,13 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
                       className={`layer-hit ${selected.includes(l.id) ? "is-selected" : ""}`}
                       aria-label={l.name}
                       style={{
-                        left: `${l.kind === "background" || l.kind === "particles" ? 50 : l.x}%`,
-                        top: `${l.kind === "background" || l.kind === "particles" ? 50 : l.y}%`,
-                        width: `${l.kind === "background" || l.kind === "particles" ? 100 : l.w}%`,
-                        height: `${l.kind === "background" || l.kind === "particles" ? 100 : l.h}%`,
+                        left: `${l.kind === "particles" ? 50 : l.x}%`,
+                        top: `${l.kind === "particles" ? 50 : l.y}%`,
+                        width: `${l.kind === "particles" ? 100 : l.w}%`,
+                        height: `${l.kind === "particles" ? 100 : l.h}%`,
                         transform: `translate(-50%,-50%) rotate(${l.rotation}deg)`,
                         pointerEvents:
-                          l.kind === "background" || l.kind === "particles"
+                          l.kind === "particles"
                             ? selected.includes(l.id)
                               ? "auto"
                               : "none"

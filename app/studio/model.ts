@@ -302,8 +302,10 @@ export function resizeProjectCanvas(
   const offsetX = (nextWidth - p.width * factor) / 2;
   const offsetY = (nextHeight - p.height * factor) / 2;
   const layers = p.layers.map((l) => {
-    // Full-canvas layers must remain full-canvas; they are not letterboxed.
-    if (l.kind === "background" || l.kind === "particles")
+    // Particle simulation is intentionally canvas-wide. Backgrounds are
+    // regular transformable layers so users can crop, reposition, and scale
+    // an imported image/video without the model snapping it back on resize.
+    if (l.kind === "particles")
       return { ...l, x: 50, y: 50, w: 100, h: 100 };
     const px = (l.x / 100) * p.width;
     const py = (l.y / 100) * p.height;
@@ -328,11 +330,22 @@ export function normalizeProject(p: Project): Project {
   return {
     ...p,
     version: 2,
-    layers: p.layers.map((l) =>
-      l.kind === "background" || l.kind === "particles"
-        ? { ...l, x: 50, y: 50, w: 100, h: 100 }
-        : l,
-    ),
+    layers: p.layers.map((l) => {
+      if (l.kind === "particles")
+        return { ...l, x: 50, y: 50, w: 100, h: 100 };
+      const finite = (value: unknown, fallback: number) =>
+        typeof value === "number" && Number.isFinite(value) ? value : fallback;
+      const maxDimension = l.kind === "background" ? 200 : 100;
+      return {
+        ...l,
+        x: clamp(finite(l.x, 50), 0, 100),
+        y: clamp(finite(l.y, 50), 0, 100),
+        w: clamp(finite(l.w, 40), 0.1, maxDimension),
+        h: clamp(finite(l.h, 40), 0.1, maxDimension),
+        rotation: finite(l.rotation, 0),
+        opacity: clamp(finite(l.opacity, 1), 0, 1),
+      };
+    }),
   };
 }
 export function timeLabel(t: number) {

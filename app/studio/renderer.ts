@@ -821,7 +821,10 @@ export function renderScene(
     ...p.layers.filter((l) => l.kind !== "background"),
   ]) {
     if (!l.visible || l.opacity <= 0) continue;
-    const fullBleed = l.kind === "background" || l.kind === "particles";
+    // Particles are a canvas-wide simulation. Backgrounds use their own
+    // transform, just like every other visual layer, so imported media can be
+    // moved and resized without being silently stretched to the canvas.
+    const fullBleed = l.kind === "particles";
     const w = fullBleed ? p.width : (l.w / 100) * p.width,
       h = fullBleed ? p.height : (l.h / 100) * p.height;
     c.save();
