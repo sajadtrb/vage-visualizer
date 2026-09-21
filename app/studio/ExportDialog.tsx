@@ -9,12 +9,14 @@ export default function ExportDialog({
   analysis,
   onClose,
   onSettings,
+  onReserveRender,
   t,
 }: {
   project: Project;
   analysis?: AudioAnalysis;
   onClose: () => void;
   onSettings: (p: Project["export"]) => void;
+  onReserveRender?: () => Promise<void>;
   t: Translate;
 }) {
   const [width, setWidth] = useState(project.export.width ?? project.width),
@@ -51,6 +53,7 @@ export default function ExportDialog({
     abort.current = controller;
     setBusy(true);
     try {
+      if (onReserveRender) await onReserveRender();
       onSettings({ fps, quality, width, height, start, end });
       const blob = await exportMP4(
         { ...project, start, end, export: { fps, quality, width, height } },

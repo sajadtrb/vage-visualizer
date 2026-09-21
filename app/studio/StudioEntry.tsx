@@ -19,6 +19,8 @@ export default function StudioEntry() {
   const [localPreview, setLocalPreview] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [lang, setLang] = useState<"en" | "fa">("en");
+  const fa = lang === "fa";
 
   useEffect(() => {
     const nextClient = getStudioAuthClient();
@@ -61,31 +63,30 @@ export default function StudioEntry() {
   }
 
   return (
-    <main className="studio-entry">
+    <main className="studio-entry" dir={fa ? "rtl" : "ltr"}>
       <div className="studio-entry__glow studio-entry__glow--one" />
       <div className="studio-entry__glow studio-entry__glow--two" />
       <header className="studio-entry__topbar">
         <a className="studio-entry__brand" href="https://vagemedia.com">
-          <b>V</b>
+          <img src="/brand/vage-mark-white.png" alt="Vage Media" />
           <span>VAGE <small>MEDIA</small></span>
         </a>
-        <span className="studio-entry__product">VAGE CONTENT STUDIO</span>
+        <div className="studio-entry__topbar-actions"><span className="studio-entry__product">VAGE CONTENT STUDIO</span><button className="studio-entry__language" onClick={() => setLang(fa ? "en" : "fa")}>{fa ? "EN" : "فارسی"}</button></div>
       </header>
 
       <section className="studio-entry__hero">
         <div className="studio-entry__copy">
-          <p className="studio-entry__eyebrow">VAGE MEDIA / CREATIVE TOOL</p>
-          <h1>Turn every track into a visual release.</h1>
+          <p className="studio-entry__eyebrow">{fa ? "VAGE MEDIA / CREATIVE TOOL" : "VAGE MEDIA / CREATIVE TOOL"}</p>
+          <h1>{fa ? "هر ایده را به یک خروجی حرفه‌ای تبدیل کن." : "Turn every idea into a polished release."}</h1>
           <p className="studio-entry__lede">
-            Build audio-reactive visuals for YouTube, Reels, Spotify Canvas and every platform in your release plan.
-            Import your sound, shape every layer, preview the motion and export locally.
+            {fa ? "برای شبکه‌های اجتماعی و پلتفرم‌های مختلف طراحی کن، لایه‌ها را کنترل کن، پیش‌نمایش بگیر و خروجی بگیر؛ همه‌چیز در یک استودیوی خلاق و امن." : "Design for social platforms, control every layer, preview motion and export locally in one focused creative studio."}
           </p>
           <div className="studio-entry__actions">
             <button className="studio-entry__primary" onClick={() => setMode("signup")}>
-              Create Studio account <span>↗</span>
+              {fa ? "ساخت حساب استودیو" : "Create Studio account"} <span>↗</span>
             </button>
             <button className="studio-entry__secondary" onClick={() => setMode("signin")}>
-              Sign in
+              {fa ? "ورود" : "Sign in"}
             </button>
           </div>
           {!studioAuthConfigured && process.env.NODE_ENV !== "production" && (

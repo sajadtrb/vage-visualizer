@@ -38,6 +38,9 @@ import {
 import { loadFonts } from "./fonts";
 import { fa } from "./i18n";
 import LegacyBackup from "./LegacyBackup";
+import StudioDashboard from "./StudioDashboard";
+import { reserveStudioRender } from "./studioData";
+import { getStoredStudioSession } from "./studioAuth";
 const ExportDialog = dynamic(() => import("./ExportDialog"), { ssr: false });
 const icons: Record<Kind, string> = {
   background: "▧",
@@ -118,6 +121,7 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
     [showProjects, setShowProjects] = useState(false),
     [projects, setProjects] = useState<Project[]>([]),
     [showExport, setShowExport] = useState(false),
+    [showDashboard, setShowDashboard] = useState(false),
     [inspectorTab, setInspectorTab] = useState("Layer"),
     [customCanvas, setCustomCanvas] = useState({
       width: "1280",
@@ -907,6 +911,7 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
             ↷
           </button>
           <button onClick={openLibrary}>{t("Projects")}</button>
+          <button onClick={() => setShowDashboard(true)}>{t("Dashboard")}</button>
           <button onClick={() => safely(() => persist(project))}>
             {t("Save")}
           </button>
@@ -1637,9 +1642,14 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
           analysis={analysis}
           onClose={() => setShowExport(false)}
           onSettings={(s) => update((p) => ({ ...p, export: s }))}
+          onReserveRender={getStoredStudioSession() ? async () => {
+            const result = await reserveStudioRender();
+            if (!result.granted) throw new Error(lang === "fa" ? "سهمیه رندر این هفته تمام شده است." : "Your weekly render quota is used.");
+          } : undefined}
           t={t}
         />
       )}
+      {showDashboard && <StudioDashboard lang={lang} onClose={() => setShowDashboard(false)} />}
     </main>
   );
 }

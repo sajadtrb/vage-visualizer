@@ -17,6 +17,10 @@ function storedSession() {
   try { return JSON.parse(localStorage.getItem(storageKey) || "null") as StudioSession | null; } catch { return null; }
 }
 
+export function getStoredStudioSession() {
+  return storedSession();
+}
+
 function setStoredSession(session: StudioSession | null, event: AuthEvent) {
   if (typeof window !== "undefined") {
     if (session) localStorage.setItem(storageKey, JSON.stringify(session));
