@@ -53,6 +53,7 @@ export default function StudioEntry() {
   if (session || localPreview) {
     return (
       <Studio
+        storageScope={session?.user.id || "local-preview"}
         onSignOut={
           session && client
             ? async () => {

@@ -366,6 +366,16 @@ small,
   user-select: none;
   flex-shrink: 0;
 }
+.performance-note {
+  margin: 0 0 12px;
+  padding: 9px 10px;
+  border: 1px solid #343d50;
+  border-radius: 8px;
+  background: #171c28;
+  color: #8f98aa;
+  font-size: 10px;
+  line-height: 1.55;
+}
 .layer-row > .layer-select {
   display: flex;
   gap: 10px;

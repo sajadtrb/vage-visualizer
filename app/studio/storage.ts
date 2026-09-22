@@ -1,9 +1,20 @@
 import type { Project } from "./model";
 export type Asset = { id: string; name: string; type: string; blob: Blob };
 let connection: Promise<IDBDatabase> | undefined;
+let storageScope = "local-preview";
+
+// Local projects and imported media are isolated per Studio account. A user
+// sharing the same browser profile must never see another account's files.
+export function setStorageScope(scope?: string | null) {
+  const next = (scope || "local-preview").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64);
+  if (next === storageScope) return;
+  storageScope = next || "local-preview";
+  connection = undefined;
+}
+
 function db() {
   return (connection ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const r = indexedDB.open("vage-studio-v2", 1);
+    const r = indexedDB.open(`vage-studio-v2-${storageScope}`, 1);
     r.onupgradeneeded = () => {
       r.result.createObjectStore("projects", { keyPath: "id" });
       r.result.createObjectStore("assets", { keyPath: "id" });

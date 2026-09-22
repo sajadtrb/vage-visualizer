@@ -1,4 +1,4 @@
-import { Layer, Project, num, str, clamp } from "./model";
+import { Layer, Project, num, str, clamp, PERFORMANCE_LIMITS } from "./model";
 import { Features, silence, AudioAnalysis } from "./audio";
 import { MediaLibrary } from "./media";
 export const rand = (i: number, seed = 42) => {
@@ -34,7 +34,7 @@ function spectrum(
 ) {
   const s = l.settings,
     style = str(s, "style"),
-    count = num(s, "count", 64),
+    count = clamp(Math.round(num(s, "count", 64)), 16, PERFORMANCE_LIMITS.spectrumCount),
     gain = num(s, "gain", 1) * num(s, "sensitivity", 1) * num(s, "reaction", 1),
     min = num(s, "minFrequency", 30),
     max = Math.max(min + 10, num(s, "maxFrequency", 16000));
@@ -67,7 +67,7 @@ function spectrum(
   c.fillStyle = color;
   c.strokeStyle = color;
   c.lineWidth = num(s, "thickness", 2);
-  glow(c, color, num(s, "glow"));
+  glow(c, color, clamp(num(s, "glow"), 0, PERFORMANCE_LIMITS.spectrumGlow));
   if (s.gradient) {
     const g = c.createLinearGradient(0, 0, w, h);
     g.addColorStop(0, color);
@@ -255,7 +255,7 @@ function particles(
   f: Features,
 ) {
   const s = l.settings,
-    n = num(s, "count", 100),
+    n = clamp(Math.round(num(s, "count", 100)), 1, PERFORMANCE_LIMITS.particleCount),
     seed = num(s, "seed", 42),
     style = str(s, "style"),
     speed = num(s, "speed", 0.25),
@@ -270,8 +270,8 @@ function particles(
     r = num(s, "random", 1),
     spread = num(s, "spread", 1);
   c.fillStyle = c.strokeStyle = color;
-  c.filter = `blur(${num(s, "blur")}px)`;
-  glow(c, color, s.glow ? num(s, "glowIntensity", 6) : 0);
+  c.filter = `blur(${clamp(num(s, "blur"), 0, PERFORMANCE_LIMITS.particleBlur)}px)`;
+  glow(c, color, s.glow ? clamp(num(s, "glowIntensity", 6), 0, PERFORMANCE_LIMITS.particleGlow) : 0);
   const points = Array.from({ length: n }, (_, i) => {
     const a = rand(i + 4, seed) * tau;
     let x = (rand(i, seed) - 0.5) * spread * w,
@@ -317,7 +317,7 @@ function particles(
   });
   if (s.connections) {
     c.shadowBlur = 0;
-    const d = num(s, "distance", 120);
+    const d = clamp(num(s, "distance", 120), 10, PERFORMANCE_LIMITS.particleConnections);
     for (let i = 0; i < n; i++)
       for (let j = i + 1; j < n; j++) {
         const dist = Math.hypot(
@@ -467,7 +467,8 @@ function background(
   media: MediaLibrary,
 ) {
   const s = l.settings;
-  c.filter = `blur(${num(s, "blur")}px) brightness(${num(s, "brightness", 100)}%) contrast(${num(s, "contrast", 100)}%) saturate(${num(s, "saturation", 100)}%) hue-rotate(${num(s, "hue")}deg)`;
+  const blur = clamp(num(s, "blur"), 0, PERFORMANCE_LIMITS.backgroundBlur);
+  c.filter = `blur(${blur}px) brightness(${num(s, "brightness", 100)}%) contrast(${num(s, "contrast", 100)}%) saturate(${num(s, "saturation", 100)}%) hue-rotate(${num(s, "hue")}deg)`;
   c.fillStyle = str(s, "color", "#111726");
   if (str(s, "mode") === "Gradient") {
     const g = c.createLinearGradient(0, 0, w, h);
@@ -476,10 +477,10 @@ function background(
     c.fillStyle = g;
   }
   c.fillRect(
-    -num(s, "blur") * 3,
-    -num(s, "blur") * 3,
-    w + num(s, "blur") * 6,
-    h + num(s, "blur") * 6,
+    -blur * 3,
+    -blur * 3,
+    w + blur * 6,
+    h + blur * 6,
   );
   if (l.asset) {
     const img = media.images.get(l.asset) || media.videos.get(l.asset);
@@ -488,7 +489,7 @@ function background(
           img instanceof HTMLVideoElement ? img.videoWidth : img.naturalWidth,
         ih =
           img instanceof HTMLVideoElement ? img.videoHeight : img.naturalHeight,
-        scale = Math.max(w / iw, h / ih) * (1 + num(s, "blur") / 80);
+        scale = Math.max(w / iw, h / ih) * (1 + blur / 80);
       c.drawImage(
         img,
         (w - iw * scale) / 2,

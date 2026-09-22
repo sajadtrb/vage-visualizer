@@ -1,4 +1,5 @@
 export const fa: Record<string, string> = {
+  "Performance-safe limits are applied automatically to keep preview smooth.": "برای روان ماندن پیش‌نمایش، سقف‌های ایمن عملکرد به‌صورت خودکار اعمال می‌شوند.",
   Dashboard: "داشبورد",
   "Compatibility encoder (slower)": "مبدل سازگارتر (کندتر)",
   "Constant frame-rate encoder (recommended)": "رمزگذار نرخ فریم ثابت (پیشنهادی)",

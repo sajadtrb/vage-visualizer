@@ -120,6 +120,16 @@ export const str = (s: Settings, k: string, f = "") =>
   typeof s[k] === "string" ? (s[k] as string) : f;
 export const clamp = (n: number, min: number, max: number) =>
   Math.max(min, Math.min(max, n));
+export const PERFORMANCE_LIMITS = {
+  particleCount: 100,
+  particleBlur: 8,
+  particleGlow: 18,
+  particleConnections: 250,
+  spectrumCount: 96,
+  spectrumGlow: 24,
+  backgroundBlur: 30,
+  textGlow: 30,
+} as const;
 export function layer(kind: Kind, id: string): Layer {
   const common = {
     id,
@@ -333,10 +343,35 @@ export function normalizeProject(p: Project): Project {
     ...p,
     version: 2,
     layers: p.layers.map((l) => {
-      if (l.kind === "particles")
-        return { ...l, x: 50, y: 50, w: 100, h: 100 };
       const finite = (value: unknown, fallback: number) =>
         typeof value === "number" && Number.isFinite(value) ? value : fallback;
+      if (l.kind === "particles")
+        return {
+          ...l,
+          x: 50,
+          y: 50,
+          w: 100,
+          h: 100,
+          settings: {
+            ...l.settings,
+            count: clamp(
+              Math.round(finite(l.settings.count, 100)),
+              1,
+              PERFORMANCE_LIMITS.particleCount,
+            ),
+            blur: clamp(finite(l.settings.blur, 0), 0, PERFORMANCE_LIMITS.particleBlur),
+            glowIntensity: clamp(
+              finite(l.settings.glowIntensity, 6),
+              0,
+              PERFORMANCE_LIMITS.particleGlow,
+            ),
+            distance: clamp(
+              finite(l.settings.distance, 120),
+              10,
+              PERFORMANCE_LIMITS.particleConnections,
+            ),
+          },
+        };
       // Every layer is allowed to extend beyond the composition frame. The
       // canvas is a viewport, not a clipping boundary for editor transforms.
       const maxDimension = 400;
@@ -348,6 +383,29 @@ export function normalizeProject(p: Project): Project {
         h: clamp(finite(l.h, 40), 0.1, maxDimension),
         rotation: finite(l.rotation, 0),
         opacity: clamp(finite(l.opacity, 1), 0, 1),
+        settings:
+          l.kind === "spectrum"
+              ? {
+                  ...l.settings,
+                  count: clamp(
+                    Math.round(finite(l.settings.count, 64)),
+                    16,
+                    PERFORMANCE_LIMITS.spectrumCount,
+                  ),
+                  glow: clamp(finite(l.settings.glow, 0), 0, PERFORMANCE_LIMITS.spectrumGlow),
+                }
+              : l.kind === "background"
+                ? {
+                    ...l.settings,
+                    blur: clamp(finite(l.settings.blur, 0), 0, PERFORMANCE_LIMITS.backgroundBlur),
+                  }
+                : l.kind === "text"
+                  ? {
+                      ...l.settings,
+                      glow: clamp(finite(l.settings.glow, 0), 0, PERFORMANCE_LIMITS.textGlow),
+                      shadow: clamp(finite(l.settings.shadow, 0), 0, PERFORMANCE_LIMITS.textGlow),
+                    }
+                  : l.settings,
       };
     }),
   };

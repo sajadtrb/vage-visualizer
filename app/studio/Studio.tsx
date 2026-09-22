@@ -24,6 +24,7 @@ import {
   putAsset,
   saveProject,
   setActive,
+  setStorageScope,
 } from "./storage";
 import { AudioAnalysis } from "./audio";
 import { MediaLibrary } from "./media";
@@ -131,7 +132,13 @@ function visibleLayerBounds(layer: Layer, project: Project) {
   };
 }
 
-export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
+export default function Studio({
+  onSignOut,
+  storageScope = "local-preview",
+}: {
+  onSignOut?: () => void;
+  storageScope?: string;
+}) {
   const [project, setProject] = useState<Project>(() =>
     freshProject("initial"),
   );
@@ -283,6 +290,7 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
     }
   };
   useEffect(() => {
+    setStorageScope(storageScope);
     let active = true;
     (async () => {
       try {
@@ -306,7 +314,7 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
     return () => {
       active = false;
     };
-  }, []);
+  }, [storageScope]);
   useEffect(() => {
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === "fa" ? "rtl" : "ltr";

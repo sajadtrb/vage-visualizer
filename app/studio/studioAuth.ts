@@ -97,6 +97,28 @@ async function refreshStoredSession(force = false) {
   return refreshInFlight;
 }
 
+async function validateStoredSession(session: StudioSession | null) {
+  if (!session || !url || !key) return session;
+  try {
+    const response = await fetch(`${url}/auth/v1/user`, {
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${session.access_token}`,
+      },
+    });
+    if (response.ok) return session;
+    if ([401, 403].includes(response.status)) {
+      if (storedSession()?.access_token === session.access_token)
+        setStoredSession(null, "SIGNED_OUT");
+      return null;
+    }
+  } catch {
+    // Keep the session during transient offline/network failures.
+  }
+  return session;
+}
+
 export async function refreshStudioSession(force = false) {
   return refreshStoredSession(force);
 }
@@ -140,7 +162,11 @@ export function getStudioAuthClient() {
   return {
     auth: {
       async getSession() {
-        return { data: { session: await refreshStoredSession() } };
+        return {
+          data: {
+            session: await validateStoredSession(await refreshStoredSession()),
+          },
+        };
       },
       onAuthStateChange(listener: Listener) {
         listeners.add(listener);

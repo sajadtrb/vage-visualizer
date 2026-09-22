@@ -6,6 +6,7 @@ import {
   particleStyles,
   spectra,
   platforms,
+  PERFORMANCE_LIMITS,
 } from "./model";
 import { latinFonts, arabicFonts } from "./fonts";
 export type Translate = (s: string) => string;
@@ -157,8 +158,8 @@ const textSpecs: Spec[] = [
   },
   { key: "spacing", label: "Letter spacing", min: -5, max: 40, step: 0.1 },
   { key: "lineHeight", label: "Line height", min: 0.5, max: 3, step: 0.05 },
-  { key: "shadow", label: "Shadow", min: 0, max: 50 },
-  { key: "glow", label: "Glow", min: 0, max: 50 },
+  { key: "shadow", label: "Shadow", min: 0, max: PERFORMANCE_LIMITS.textGlow },
+  { key: "glow", label: "Glow", min: 0, max: PERFORMANCE_LIMITS.textGlow },
   { key: "outline", label: "Outline width", min: 0, max: 8, step: 0.5 },
   { key: "outlineColor", label: "Outline color", type: "color" },
   { key: "background", label: "Text background", type: "toggle" },
@@ -193,7 +194,7 @@ const bgSpecs: Spec[] = [
   },
   { key: "color", label: "Background color", type: "color" },
   { key: "color2", label: "Gradient color", type: "color" },
-  { key: "blur", label: "Blur", min: 0, max: 60 },
+  { key: "blur", label: "Blur", min: 0, max: PERFORMANCE_LIMITS.backgroundBlur },
   { key: "brightness", label: "Brightness", min: 0, max: 200 },
   { key: "contrast", label: "Contrast", min: 0, max: 200 },
   { key: "saturation", label: "Saturation", min: 0, max: 200 },
@@ -249,7 +250,7 @@ const spectrumSpecs: Spec[] = [
   { key: "reaction", label: "Music reaction", min: 0, max: 4, step: 0.05 },
   { key: "bass", label: "Bass response", min: 0, max: 4, step: 0.05 },
   { key: "smoothing", label: "Smoothing", min: 0, max: 1, step: 0.01 },
-  { key: "count", label: "Bar count", min: 16, max: 128 },
+  { key: "count", label: "Bar count", min: 16, max: PERFORMANCE_LIMITS.spectrumCount },
   { key: "gap", label: "Bar gap", min: 0, max: 0.9, step: 0.01 },
   { key: "barWidth", label: "Bar width", min: 0.1, max: 1, step: 0.05 },
   { key: "thickness", label: "Line thickness", min: 0.5, max: 15, step: 0.5 },
@@ -284,12 +285,12 @@ const particleSpecs: Spec[] = [
     options: particleStyles,
   },
   { key: "color", label: "Particle color", type: "color" },
-  { key: "count", label: "Count", min: 1, max: 350 },
+  { key: "count", label: "Count", min: 1, max: PERFORMANCE_LIMITS.particleCount },
   { key: "minSize", label: "Minimum size", min: 0.05, max: 10, step: 0.05 },
   { key: "maxSize", label: "Maximum size", min: 0.05, max: 20, step: 0.05 },
   { key: "glow", label: "Glow enabled", type: "toggle" },
-  { key: "glowIntensity", label: "Glow intensity", min: 0, max: 30 },
-  { key: "blur", label: "Blur", min: 0, max: 15, step: 0.1 },
+  { key: "glowIntensity", label: "Glow intensity", min: 0, max: PERFORMANCE_LIMITS.particleGlow },
+  { key: "blur", label: "Blur", min: 0, max: PERFORMANCE_LIMITS.particleBlur, step: 0.1 },
   { key: "speed", label: "Base speed", min: 0, max: 4, step: 0.05 },
   { key: "random", label: "Random movement", min: 0, max: 4, step: 0.05 },
   { key: "reaction", label: "Music reaction", min: 0, max: 5, step: 0.05 },
@@ -312,7 +313,7 @@ const particleSpecs: Spec[] = [
   },
   { key: "spread", label: "Spread", min: 0.1, max: 2, step: 0.05 },
   { key: "connections", label: "Connection lines", type: "toggle" },
-  { key: "distance", label: "Connection distance", min: 10, max: 400 },
+  { key: "distance", label: "Connection distance", min: 10, max: PERFORMANCE_LIMITS.particleConnections },
   {
     key: "connectionOpacity",
     label: "Connection opacity",
@@ -445,6 +446,9 @@ export function LayerSettings({
       )}
       {value.kind === "particles" && (
         <>
+          <p className="performance-note">
+            {t("Performance-safe limits are applied automatically to keep preview smooth.")}
+          </p>
           <SettingsFields
             specs={particleSpecs}
             settings={s}
