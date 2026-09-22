@@ -132,6 +132,9 @@ export const effectsSpecs: Spec[] = [
   { key: "speed", label: "Speed", min: 0, max: 4, step: 0.05 },
   { key: "sync", label: "Sync to music", type: "toggle" },
   { key: "reaction", label: "Music reaction", min: 0, max: 4, step: 0.05 },
+  { key: "band", label: "Audio band", type: "select", options: ["Energy", "Bass", "Mid", "Treble"] },
+  { key: "baseline", label: "Minimum effect", min: 0, max: 1, step: 0.01 },
+  { key: "threshold", label: "Audio threshold", min: 0, max: 0.9, step: 0.01 },
 ];
 const textSpecs: Spec[] = [
   { key: "color", label: "Text color", type: "color" },
@@ -500,6 +503,7 @@ export function LayerSettings({
           t={t}
         />
       )}
+      {value.kind === "effect" && <SettingsFields specs={effectsSpecs} settings={s} onChange={onChange} t={t} />}
     </section>
   );
 }

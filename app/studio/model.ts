@@ -1,5 +1,5 @@
 export type Kind =
-  "background" | "image" | "text" | "spectrum" | "particles" | "logo";
+  "background" | "image" | "text" | "spectrum" | "particles" | "logo" | "effect";
 export type Settings = Record<string, string | number | boolean>;
 export type Layer = {
   id: string;
@@ -103,6 +103,7 @@ export const effectStyles = [
   "Noise",
   "Retro film",
   "Analog distortion",
+  "Warm wash", "Cool wash",
 ];
 export const platforms = [
   "Spotify",
@@ -134,6 +135,7 @@ export function layer(kind: Kind, id: string): Layer {
     locked: false,
   };
   const settings: Record<Kind, Settings> = {
+    effect: { enabled: true, style: "Light leak", intensity: 0.3, blend: 0.6, speed: 1, sync: false, reaction: 1, baseline: 0.2, band: "Energy" },
     background: {
       mode: "Gradient",
       color: "#111726",
@@ -335,11 +337,11 @@ export function normalizeProject(p: Project): Project {
         return { ...l, x: 50, y: 50, w: 100, h: 100 };
       const finite = (value: unknown, fallback: number) =>
         typeof value === "number" && Number.isFinite(value) ? value : fallback;
-      const maxDimension = l.kind === "background" ? 200 : 100;
+      const maxDimension = l.kind === "background" || l.kind === "spectrum" ? 400 : 100;
       return {
         ...l,
-        x: clamp(finite(l.x, 50), 0, 100),
-        y: clamp(finite(l.y, 50), 0, 100),
+        x: clamp(finite(l.x, 50), l.kind === "spectrum" ? -200 : 0, l.kind === "spectrum" ? 300 : 100),
+        y: clamp(finite(l.y, 50), l.kind === "spectrum" ? -200 : 0, l.kind === "spectrum" ? 300 : 100),
         w: clamp(finite(l.w, 40), 0.1, maxDimension),
         h: clamp(finite(l.h, 40), 0.1, maxDimension),
         rotation: finite(l.rotation, 0),

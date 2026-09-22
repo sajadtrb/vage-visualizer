@@ -43,6 +43,7 @@ import { reserveStudioRender } from "./studioData";
 import { getStoredStudioSession } from "./studioAuth";
 const ExportDialog = dynamic(() => import("./ExportDialog"), { ssr: false });
 const icons: Record<Kind, string> = {
+  effect: "✧",
   background: "▧",
   image: "▣",
   text: "T",
@@ -759,6 +760,8 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
       const center = (value: number, size: number) =>
         l.kind === "background"
           ? clamp(value, 0, 100)
+          : l.kind === "spectrum"
+            ? clamp(value, -200, 300)
           : size >= 100
             ? 50
             : clamp(value, size / 2, 100 - size / 2);
@@ -785,7 +788,7 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
         ly = dx * Math.sin(a) + dy * Math.cos(a);
       const sx = d.corner === 0 || d.corner === 3 ? -1 : 1,
         sy = d.corner < 2 ? -1 : 1;
-      const maxDimension = l.kind === "background" ? 200 : 100;
+      const maxDimension = l.kind === "background" || l.kind === "spectrum" ? 400 : 100;
       const nw = clamp(
           l.w + ((2 * lx) / project.width) * 100 * sx,
           0.1,
@@ -1002,6 +1005,13 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
                 <span>{project.layers.length.toString().padStart(2, "0")}</span>
               </div>
               <div className="layer-stack">
+                <button onClick={() => add("effect")}>{t("Add effect layer")}</button>
+                <div aria-label="Layer order">
+                  <button disabled={!selectedLayer} onClick={() => order("front")}>⇈ {t("Front")}</button>
+                  <button disabled={!selectedLayer} onClick={() => order("up")}>↑ {t("Forward")}</button>
+                  <button disabled={!selectedLayer} onClick={() => order("down")}>↓ {t("Backward")}</button>
+                  <button disabled={!selectedLayer} onClick={() => order("back")}>⇊ {t("Back")}</button>
+                </div>
                 {[...project.layers].reverse().map((l) => (
                   <div
                     key={l.id}
@@ -1474,6 +1484,13 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
           {inspectorTab === "Effects" ? (
             <section className="settings-card">
               <h3>{t("Effects")}</h3>
+              <p>{t("Effect layers affect the layers below them. Global effects affect the full composition.")}</p>
+              <button onClick={() => { add("effect"); setInspectorTab("Layer"); }}>{t("Add effect layer")}</button>
+              <SettingsFields specs={[
+                { key: "intro", label: "Intro", type: "select", options: ["None", "Fade", "Open horizontal", "Open vertical"] },
+                { key: "outro", label: "Outro", type: "select", options: ["None", "Fade", "Open horizontal", "Open vertical"] },
+                { key: "transitionDuration", label: "Transition duration", min: 0.1, max: 5, step: 0.1 },
+              ]} settings={project.effects} onChange={s => update(p => ({ ...p, effects: { ...p.effects, ...s } }))} t={t} />
               {project.effects.style === "Strobe" && (
                 <p className="hint" role="note">
                   {lang === "fa"

@@ -564,7 +564,7 @@ function effects(
     k = clamp(
       num(s, "intensity", 0.3) *
         num(s, "blend", 0.6) *
-        (s.sync ? f.energy * num(s, "reaction", 1) * 3 : 1),
+        (s.sync ? num(s, "baseline", 0.2) + Math.max(0, (str(s, "band") === "Bass" ? f.bass : str(s, "band") === "Mid" ? f.mid : str(s, "band") === "Treble" ? f.treble : f.energy) - num(s, "threshold")) * num(s, "reaction", 1) * 2 : 1),
       0,
       1,
     ),
@@ -651,13 +651,13 @@ function effects(
         c.fillStyle = g;
         c.fillRect(0, 0, w, h);
       }
-      if (style === "Glare" || style === "Lens flare") {
-        c.fillStyle = "#d9edff";
-        c.fillRect(0, y, w, 2);
-      }
     }
   } else if (style === "Strobe") {
     c.globalAlpha = k * (Math.sin(time * 18) > 0.8 ? 1 : 0);
+    c.fillRect(0, 0, w, h);
+  } else if (style === "Warm wash" || style === "Cool wash") {
+    c.globalCompositeOperation = "soft-light";
+    c.fillStyle = style === "Warm wash" ? "#ff945b" : "#679dff";
     c.fillRect(0, 0, w, h);
   } else if (style === "Color drift") {
     c.globalCompositeOperation = "color";
@@ -821,6 +821,10 @@ export function renderScene(
     ...p.layers.filter((l) => l.kind !== "background"),
   ]) {
     if (!l.visible || l.opacity <= 0) continue;
+    if (l.kind === "effect") {
+      if (scratch) effects(c, { ...p, effects: { ...l.settings, blend: num(l.settings, "blend", 0.6) * l.opacity } }, time, f, scratch);
+      continue;
+    }
     // Particles are a canvas-wide simulation. Backgrounds use their own
     // transform, just like every other visual layer, so imported media can be
     // moved and resized without being silently stretched to the canvas.
@@ -871,5 +875,23 @@ export function renderScene(
     c.restore();
   }
   if (scratch) effects(c, p, time, f, scratch);
+  // Composition transitions share the same timeline in preview and export.
+  const duration = p.end - p.start;
+  const transition = (name: string, progress: number) => {
+    if (!name || name === "None" || progress >= 1) return;
+    const v = clamp(progress, 0, 1);
+    c.save(); c.fillStyle = "#000";
+    if (name === "Open horizontal") {
+      c.fillRect(0, 0, p.width * (1-v)/2, p.height);
+      c.fillRect(p.width * (1+v)/2, 0, p.width, p.height);
+    } else if (name === "Open vertical") {
+      c.fillRect(0, 0, p.width, p.height * (1-v)/2);
+      c.fillRect(0, p.height * (1+v)/2, p.width, p.height);
+    } else { c.globalAlpha = 1-v; c.fillRect(0,0,p.width,p.height); }
+    c.restore();
+  };
+  const td = Math.min(Math.max(0.1, num(p.effects, "transitionDuration", 1)), duration/2);
+  transition(str(p.effects, "intro"), time/td);
+  transition(str(p.effects, "outro"), (duration-time)/td);
   c.restore();
 }
