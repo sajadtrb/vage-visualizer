@@ -14,7 +14,13 @@ export function setStorageScope(scope?: string | null) {
 
 function db() {
   return (connection ??= new Promise<IDBDatabase>((resolve, reject) => {
-    const r = indexedDB.open(`vage-studio-v2-${storageScope}`, 1);
+    // Keep the original local-preview database so existing offline projects
+    // remain available; signed-in accounts use isolated databases.
+    const name =
+      storageScope === "local-preview"
+        ? "vage-studio-v2"
+        : `vage-studio-v2-${storageScope}`;
+    const r = indexedDB.open(name, 1);
     r.onupgradeneeded = () => {
       r.result.createObjectStore("projects", { keyPath: "id" });
       r.result.createObjectStore("assets", { keyPath: "id" });
