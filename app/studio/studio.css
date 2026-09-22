@@ -334,6 +334,16 @@ small,
   border: 1px solid transparent;
   border-radius: 8px;
   min-width: 0;
+  cursor: grab;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+.layer-row:active {
+  cursor: grabbing;
+}
+.layer-row.drag-over {
+  border-color: #bcaaff;
+  background: #302b43;
+  transform: translateY(-2px);
 }
 .layer-row.selected {
   background: #282737;
@@ -345,6 +355,15 @@ small,
   background: none;
   font-size: 12px;
   color: #8c94a4;
+  flex-shrink: 0;
+}
+.layer-drag-handle {
+  width: 16px;
+  color: #697286;
+  font-size: 12px;
+  letter-spacing: -3px;
+  text-align: center;
+  user-select: none;
   flex-shrink: 0;
 }
 .layer-row > .layer-select {

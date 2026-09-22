@@ -104,6 +104,33 @@ type Drag = {
   bounds: DOMRect;
   corner: number;
 };
+
+function visibleLayerBounds(layer: Layer, project: Project) {
+  if (layer.kind !== "text" || layer.settings.background) {
+    return { w: layer.w, h: layer.h };
+  }
+  const text = typeof layer.settings.text === "string" ? layer.settings.text : "";
+  const size = typeof layer.settings.size === "number" ? layer.settings.size : 64;
+  const spacing = typeof layer.settings.spacing === "number" ? layer.settings.spacing : 0;
+  const padding = typeof layer.settings.padding === "number" ? layer.settings.padding : 12;
+  const lineHeight = typeof layer.settings.lineHeight === "number" ? layer.settings.lineHeight : 1.2;
+  if (typeof document === "undefined") return { w: layer.w, h: layer.h };
+  const context = document.createElement("canvas").getContext("2d");
+  if (!context) return { w: layer.w, h: layer.h };
+  const font = typeof layer.settings.font === "string" ? layer.settings.font : "Inter";
+  context.font = `${layer.settings.italic ? "italic " : ""}${layer.settings.bold ? "700" : "400"} ${size}px "${font}"`;
+  const lines = text.split("\\n");
+  const width = Math.max(
+    size,
+    ...lines.map((line) => context.measureText(line).width + Math.max(0, line.length - 1) * spacing),
+  ) + padding * 2;
+  const height = Math.max(size, lines.length * size * lineHeight) + padding * 2;
+  return {
+    w: clamp((width / project.width) * 100, 0.1, 400),
+    h: clamp((height / project.height) * 100, 0.1, 400),
+  };
+}
+
 export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
   const [project, setProject] = useState<Project>(() =>
     freshProject("initial"),
@@ -123,6 +150,8 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
     [projects, setProjects] = useState<Project[]>([]),
     [showExport, setShowExport] = useState(false),
     [showDashboard, setShowDashboard] = useState(false),
+    [dragLayerId, setDragLayerId] = useState<string | null>(null),
+    [dragOverLayerId, setDragOverLayerId] = useState<string | null>(null),
     [inspectorTab, setInspectorTab] = useState("Layer"),
     [customCanvas, setCustomCanvas] = useState({
       width: "1280",
@@ -605,6 +634,18 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
       return { ...p, layers: next };
     });
   };
+  const reorderLayers = (fromId: string, toId: string) => {
+    if (fromId === toId) return;
+    update((p) => {
+      const next = [...p.layers];
+      const from = next.findIndex((l) => l.id === fromId);
+      const to = next.findIndex((l) => l.id === toId);
+      if (from < 0 || to < 0) return p;
+      const [entry] = next.splice(from, 1);
+      next.splice(to, 0, entry);
+      return { ...p, layers: next };
+    });
+  };
   const align = (direction: string) => {
     update((p) => {
       const chosen = p.layers.filter(
@@ -740,7 +781,7 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
     future.current = [];
     drag.current = {
       mode,
-      initial: structuredClone(l),
+      initial: { ...structuredClone(l), ...visibleLayerBounds(l, project) },
       snapshot: project,
       px: e.clientX,
       py: e.clientY,
@@ -757,15 +798,9 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
     if (d.mode === "move") {
       const nextX = l.x + ((e.clientX - d.px) / d.bounds.width) * 100;
       const nextY = l.y + ((e.clientY - d.py) / d.bounds.height) * 100;
-      const center = (value: number, size: number) =>
-        l.kind === "background"
-          ? clamp(value, 0, 100)
-          : l.kind === "spectrum"
-            ? clamp(value, -200, 300)
-          : size >= 100
-            ? 50
-            : clamp(value, size / 2, 100 - size / 2);
-      patch = { x: center(nextX, l.w), y: center(nextY, l.h) };
+      // Objects are intentionally allowed outside the composition. The frame
+      // is only the render viewport; it must never constrain editor transforms.
+      patch = { x: clamp(nextX, -200, 300), y: clamp(nextY, -200, 300) };
     }
     else if (d.mode === "rotate") {
       const cx = d.bounds.left + (d.bounds.width * l.x) / 100,
@@ -788,7 +823,7 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
         ly = dx * Math.sin(a) + dy * Math.cos(a);
       const sx = d.corner === 0 || d.corner === 3 ? -1 : 1,
         sy = d.corner < 2 ? -1 : 1;
-      const maxDimension = l.kind === "background" || l.kind === "spectrum" ? 400 : 100;
+      const maxDimension = 400;
       const nw = clamp(
           l.w + ((2 * lx) / project.width) * 100 * sx,
           0.1,
@@ -1015,8 +1050,35 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
                 {[...project.layers].reverse().map((l) => (
                   <div
                     key={l.id}
-                    className={`layer-row ${selected.includes(l.id) ? "selected" : ""}`}
+                    className={`layer-row ${selected.includes(l.id) ? "selected" : ""} ${dragOverLayerId === l.id ? "drag-over" : ""}`}
+                    draggable={!l.locked}
+                    aria-grabbed={dragLayerId === l.id}
+                    onDragStart={(e) => {
+                      if (l.locked) return;
+                      setDragLayerId(l.id);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", l.id);
+                    }}
+                    onDragEnd={() => {
+                      setDragLayerId(null);
+                      setDragOverLayerId(null);
+                    }}
+                    onDragOver={(e) => {
+                      if (!dragLayerId || dragLayerId === l.id) return;
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      setDragOverLayerId(l.id);
+                    }}
+                    onDragLeave={() => setDragOverLayerId(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const fromId = dragLayerId || e.dataTransfer.getData("text/plain");
+                      if (fromId) reorderLayers(fromId, l.id);
+                      setDragLayerId(null);
+                      setDragOverLayerId(null);
+                    }}
                   >
+                    <span className="layer-drag-handle" aria-hidden="true" title={t("Drag to reorder")}>⋮⋮</span>
                     <button
                       className="layer-select"
                       aria-label={`Select ${l.name}`}
@@ -1289,6 +1351,9 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
                 {project.layers
                   .filter((l) => l.visible)
                   .map((l) => (
+                    (() => {
+                      const bounds = visibleLayerBounds(l, project);
+                      return (
                     <div
                       key={l.id}
                       data-layer-id={l.id}
@@ -1297,8 +1362,8 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
                       style={{
                         left: `${l.kind === "particles" ? 50 : l.x}%`,
                         top: `${l.kind === "particles" ? 50 : l.y}%`,
-                        width: `${l.kind === "particles" ? 100 : l.w}%`,
-                        height: `${l.kind === "particles" ? 100 : l.h}%`,
+                        width: `${l.kind === "particles" ? 100 : bounds.w}%`,
+                        height: `${l.kind === "particles" ? 100 : bounds.h}%`,
                         transform: `translate(-50%,-50%) rotate(${l.rotation}deg)`,
                         pointerEvents:
                           l.kind === "particles"
@@ -1330,6 +1395,8 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
                         </>
                       )}
                     </div>
+                      );
+                    })()
                   ))}
               </div>
             </div>

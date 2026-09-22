@@ -337,11 +337,13 @@ export function normalizeProject(p: Project): Project {
         return { ...l, x: 50, y: 50, w: 100, h: 100 };
       const finite = (value: unknown, fallback: number) =>
         typeof value === "number" && Number.isFinite(value) ? value : fallback;
-      const maxDimension = l.kind === "background" || l.kind === "spectrum" ? 400 : 100;
+      // Every layer is allowed to extend beyond the composition frame. The
+      // canvas is a viewport, not a clipping boundary for editor transforms.
+      const maxDimension = 400;
       return {
         ...l,
-        x: clamp(finite(l.x, 50), l.kind === "spectrum" ? -200 : 0, l.kind === "spectrum" ? 300 : 100),
-        y: clamp(finite(l.y, 50), l.kind === "spectrum" ? -200 : 0, l.kind === "spectrum" ? 300 : 100),
+        x: clamp(finite(l.x, 50), -200, 300),
+        y: clamp(finite(l.y, 50), -200, 300),
         w: clamp(finite(l.w, 40), 0.1, maxDimension),
         h: clamp(finite(l.h, 40), 0.1, maxDimension),
         rotation: finite(l.rotation, 0),
