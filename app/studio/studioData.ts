@@ -1,6 +1,10 @@
 "use client";
 
-import { getStoredStudioSession, refreshStudioSession, type StudioSession } from "./studioAuth";
+import {
+  getStoredStudioSession,
+  refreshStudioSession,
+  type StudioSession,
+} from "./studioAuth";
 
 const baseUrl = process.env.NEXT_PUBLIC_STUDIO_SUPABASE_URL?.replace(/\/$/, "");
 const publishableKey = process.env.NEXT_PUBLIC_STUDIO_SUPABASE_ANON_KEY;
@@ -9,6 +13,7 @@ export type AccessMode = "limited" | "free" | "unlimited";
 export type PlanCode = "free" | "starter" | "creator" | "pro" | "unlimited";
 
 export type StudioProfile = {
+  email?: string;
   user_id: string;
   display_name: string | null;
   role: "user" | "admin";
@@ -57,13 +62,35 @@ export type StudioPlan = {
 };
 
 export const studioPlans: StudioPlan[] = [
-  { code: "starter", title: "Starter", price: 500_000, renders: 2, note: "۲ رندر در هفته" },
-  { code: "creator", title: "Creator", price: 1_500_000, renders: 5, note: "۵ رندر در هفته" },
-  { code: "pro", title: "Pro", price: 3_000_000, renders: 10, note: "۱۰ رندر در هفته" },
+  {
+    code: "starter",
+    title: "Starter",
+    price: 500_000,
+    renders: 2,
+    note: "۲ رندر در هفته",
+  },
+  {
+    code: "creator",
+    title: "Creator",
+    price: 1_500_000,
+    renders: 5,
+    note: "۵ رندر در هفته",
+  },
+  {
+    code: "pro",
+    title: "Pro",
+    price: 3_000_000,
+    renders: 10,
+    note: "۱۰ رندر در هفته",
+  },
 ];
 
-function authHeaders(session: StudioSession, extra: Record<string, string> = {}) {
-  if (!baseUrl || !publishableKey) throw new Error("Studio database is not configured.");
+function authHeaders(
+  session: StudioSession,
+  extra: Record<string, string> = {},
+) {
+  if (!baseUrl || !publishableKey)
+    throw new Error("Studio database is not configured.");
   return {
     apikey: publishableKey,
     Authorization: `Bearer ${session.access_token}`,
@@ -73,20 +100,29 @@ function authHeaders(session: StudioSession, extra: Record<string, string> = {})
 }
 
 async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  let session = getStoredStudioSession();
+  let session = await refreshStudioSession();
   if (!session) throw new Error("Sign in to access your Studio account.");
-  const request = (current: StudioSession) => fetch(`${baseUrl}/rest/v1${path}`, {
-    ...init,
-    headers: authHeaders(current, (init.headers || {}) as Record<string, string>),
-  });
+  const request = (current: StudioSession) =>
+    fetch(`${baseUrl}/rest/v1${path}`, {
+      ...init,
+      signal: init.signal ?? AbortSignal.timeout(15000),
+      headers: authHeaders(
+        current,
+        (init.headers || {}) as Record<string, string>,
+      ),
+    });
   let response = await request(session);
   if (response.status === 401 && session.refresh_token) {
-    session = await refreshStudioSession();
+    session = await refreshStudioSession(true);
     if (session) response = await request(session);
   }
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = payload?.message || payload?.hint || payload?.details || "Studio data request failed.";
+    const message =
+      payload?.message ||
+      payload?.hint ||
+      payload?.details ||
+      "Studio data request failed.";
     throw new Error(String(message));
   }
   return payload as T;
@@ -95,7 +131,9 @@ async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
 export async function getMyProfile() {
   const session = getStoredStudioSession();
   if (!session) return null;
-  const rows = await rest<StudioProfile[]>(`/studio_profiles?user_id=eq.${encodeURIComponent(session.user.id)}&select=*`);
+  const rows = await rest<StudioProfile[]>(
+    `/studio_profiles?user_id=eq.${encodeURIComponent(session.user.id)}&select=*`,
+  );
   return rows[0] || null;
 }
 
@@ -107,7 +145,11 @@ export async function ensureMyProfile(displayName?: string) {
   const rows = await rest<StudioProfile[]>("/studio_profiles", {
     method: "POST",
     headers: { Prefer: "return=representation,resolution=merge-duplicates" },
-    body: JSON.stringify({ user_id: session.user.id, display_name: displayName || session.user.email?.split("@")[0] || "Studio creator" }),
+    body: JSON.stringify({
+      user_id: session.user.id,
+      display_name:
+        displayName || session.user.email?.split("@")[0] || "Studio creator",
+    }),
   });
   return rows[0] || null;
 }
@@ -115,44 +157,88 @@ export async function ensureMyProfile(displayName?: string) {
 export async function updateMyDisplayName(displayName: string) {
   const session = getStoredStudioSession();
   if (!session) throw new Error("Sign in to update your account.");
-  const rows = await rest<StudioProfile[]>(`/studio_profiles?user_id=eq.${encodeURIComponent(session.user.id)}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ display_name: displayName.trim() || null }),
-  });
-  return rows[0] || null;
+  const rows = await rest<StudioProfile[]>(
+    `/studio_profiles?user_id=eq.${encodeURIComponent(session.user.id)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ display_name: displayName.trim() || null }),
+    },
+  );
+  if (!rows[0])
+    throw new Error(
+      "Your account was not updated. Please reload and try again.",
+    );
+  return rows[0];
 }
 
 export async function listSubscriptions() {
   const session = getStoredStudioSession();
   if (!session) return [];
-  return rest<StudioSubscription[]>(`/studio_subscriptions?user_id=eq.${encodeURIComponent(session.user.id)}&select=*&order=created_at.desc`);
+  return rest<StudioSubscription[]>(
+    `/studio_subscriptions?user_id=eq.${encodeURIComponent(session.user.id)}&select=*&order=created_at.desc`,
+  );
 }
 
 export async function listPaymentEvents() {
   const session = getStoredStudioSession();
   if (!session) return [];
-  return rest<StudioPaymentEvent[]>(`/studio_payment_events?user_id=eq.${encodeURIComponent(session.user.id)}&select=*&order=created_at.desc&limit=20`);
+  return rest<StudioPaymentEvent[]>(
+    `/studio_payment_events?user_id=eq.${encodeURIComponent(session.user.id)}&select=*&order=created_at.desc&limit=20`,
+  );
 }
 
 export async function reserveStudioRender() {
-  return rest<{ granted: boolean; remaining: number | null; mode: AccessMode }>("/rpc/reserve_studio_render", {
-    method: "POST",
-    body: JSON.stringify({}),
-  });
+  return rest<{ granted: boolean; remaining: number | null; mode: AccessMode }>(
+    "/rpc/reserve_studio_render",
+    {
+      method: "POST",
+      body: JSON.stringify({}),
+    },
+  );
 }
 
 export async function listAdminProfiles() {
-  return rest<StudioProfile[]>("/studio_profiles?select=*&order=created_at.desc");
+  return rest<StudioProfile[]>(
+    "/rpc/list_studio_admin_users", { method: "POST", body: "{}" },
+  );
 }
 
-export async function updateAdminProfile(userId: string, patch: Partial<Pick<StudioProfile, "plan_code" | "access_mode" | "render_limit" | "display_name" | "renders_used_week">>) {
-  const rows = await rest<StudioProfile[]>(`/studio_profiles?user_id=eq.${encodeURIComponent(userId)}`, {
-    method: "PATCH",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify(patch),
-  });
-  return rows[0] || null;
+export async function updateAdminProfile(
+  userId: string,
+  patch: Partial<
+    Pick<
+      StudioProfile,
+      | "plan_code"
+      | "access_mode"
+      | "render_limit"
+      | "display_name"
+      | "renders_used_week"
+    >
+  >,
+) {
+  if (
+    patch.render_limit !== undefined &&
+    (!Number.isInteger(patch.render_limit) ||
+      patch.render_limit < 0 ||
+      patch.render_limit > 100000)
+  )
+    throw new Error(
+      "Weekly limit must be a whole number between 0 and 100000.",
+    );
+  const rows = await rest<StudioProfile[]>(
+    `/studio_profiles?user_id=eq.${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(patch),
+    },
+  );
+  if (!rows[0])
+    throw new Error(
+      "No user was updated. Refresh your administrator access and try again.",
+    );
+  return rows[0];
 }
 
 export function getStudioUser() {

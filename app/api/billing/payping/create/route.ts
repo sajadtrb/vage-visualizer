@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const returnUrl = process.env.PAYPING_CALLBACK_URL || new URL("/api/billing/payping/callback", request.url).toString();
   const subscription = await fetch(`${supabaseUrl}/rest/v1/studio_subscriptions`, {
     method: "POST",
-    headers: { apikey: supabaseKey, Authorization: authorization, "Content-Type": "application/json", Prefer: "return=representation" },
+    headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json", Prefer: "return=representation" },
     body: JSON.stringify({ user_id: user.id, plan_code: body.planCode, amount_toman: plan.amountToman, client_ref_id: clientRefId, status: "pending" }),
   });
   const subscriptionRows = await subscription.json().catch(() => []);
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   const subscriptionId = subscriptionRows?.[0]?.id;
   await fetch(`${supabaseUrl}/rest/v1/studio_payment_events`, {
     method: "POST",
-    headers: { apikey: supabaseKey, Authorization: authorization, "Content-Type": "application/json", Prefer: "return=minimal" },
+    headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json", Prefer: "return=minimal" },
     body: JSON.stringify({ user_id: user.id, subscription_id: subscriptionId, gateway: "payping", status: "created", amount_toman: plan.amountToman, client_ref_id: clientRefId, metadata: { plan_code: body.planCode } }),
   });
 
@@ -50,6 +50,7 @@ export async function POST(request: Request) {
   });
   const paypingPayload = await paypingResponse.json().catch(() => null);
   if (!paypingResponse.ok || !paypingPayload?.code) return json("درگاه پرداخت پاسخ معتبر نداد. درخواست پرداخت لغو شد.", 502);
-  await fetch(`${supabaseUrl}/rest/v1/studio_subscriptions?client_ref_id=eq.${encodeURIComponent(clientRefId)}`, { method: "PATCH", headers: { apikey: supabaseKey, Authorization: authorization, "Content-Type": "application/json" }, body: JSON.stringify({ payping_code: String(paypingPayload.code) }) });
+  const saved = await fetch(`${supabaseUrl}/rest/v1/studio_subscriptions?client_ref_id=eq.${encodeURIComponent(clientRefId)}`, { method: "PATCH", headers: { apikey: serviceRoleKey, Authorization: `Bearer ${serviceRoleKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ payping_code: String(paypingPayload.code) }) });
+  if (!saved.ok) return json("ثبت اطلاعات پرداخت انجام نشد. دوباره تلاش کنید.", 502);
   return NextResponse.json({ checkoutUrl: `https://api.payping.ir/v2/pay/gotoipg/${encodeURIComponent(String(paypingPayload.code))}`, clientRefId });
 }

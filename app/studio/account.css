@@ -1,0 +1,12 @@
+.studio-account-dialog { width:min(1180px,96vw); max-height:94dvh; padding:0; border:0; background:transparent; color:#f4f2ed; }
+.studio-account-dialog::backdrop { background:#05070bd9; backdrop-filter:blur(12px); }
+.studio-account-dialog .studio-dashboard { box-sizing:border-box; width:100%; }
+.studio-account-nav { display:flex; gap:10px; flex-wrap:wrap; margin:20px 0; align-items:center; }
+.studio-account-nav a,.studio-account-nav button { color:#d4caff; padding:9px 12px; background:#212636; border-radius:8px; text-decoration:none; border:1px solid #394052; font-size:12px; }
+.studio-account-dialog :focus-visible { outline:2px solid #b5a2ff; outline-offset:3px; }
+.studio-account-dialog :disabled { opacity:.55; cursor:wait; }
+.studio-user-row { border:1px solid #30394a; min-width:0; margin:0; }
+.studio-user-row small { overflow-wrap:anywhere; }
+.studio-dashboard__card--account>small { display:block; color:#aeb5c4; margin-top:12px; }
+.studio-account-dialog [id] { scroll-margin:20px; }
+@media(max-width:600px) { .studio-account-dialog .studio-dashboard { padding:16px; } .studio-account-nav a,.studio-account-nav button { flex:1 1 40%; text-align:center; } }

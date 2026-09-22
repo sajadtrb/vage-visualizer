@@ -230,7 +230,11 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
     setPlaying(false);
   }, []);
   const persist = useCallback(async (p: Project) => {
-    const thumbnail = canvas.current?.toDataURL("image/jpeg", 0.5);
+    const thumb = document.createElement("canvas");
+    thumb.width = 320;
+    thumb.height = Math.max(1, Math.round(320 * p.height / p.width));
+    if (canvas.current) thumb.getContext("2d")?.drawImage(canvas.current, 0, 0, thumb.width, thumb.height);
+    const thumbnail = thumb.toDataURL("image/jpeg", 0.5);
     const saved = { ...p, thumbnail };
     saveQueue.current = saveQueue.current
       .catch(() => {})
@@ -958,7 +962,7 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
           >
             {lang === "en" ? "فارسی" : "EN"}
           </button>
-          {onSignOut && <button onClick={onSignOut}>{t("Sign out")}</button>}
+          {onSignOut && <button onClick={() => safely(async () => { await persist(live.current); pause(); onSignOut(); })}>{t("Sign out")}</button>}
           <button
             className="primary-button"
             onClick={() => {
@@ -1646,6 +1650,14 @@ export default function Studio({ onSignOut }: { onSignOut?: () => void }) {
           onDelete={(p) =>
             safely(async () => {
               if (!window.confirm(`Delete “${p.name}”?`)) return;
+              await saveQueue.current.catch(() => {});
+              if (p.id === live.current.id) {
+                pause();
+                const next = freshProject(uid());
+                live.current = next; setProject(next); setTime(0); setSelected([]);
+                history.current = []; future.current = [];
+                await persist(next);
+              }
               await deleteProject(p.id);
               setProjects(await allProjects());
             })

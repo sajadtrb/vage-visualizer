@@ -1,10 +1,10 @@
 "use client";
+import "./account.css";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ensureMyProfile,
   getStudioUser,
-  getMyProfile,
   listAdminProfiles,
   listPaymentEvents,
   listSubscriptions,
@@ -17,13 +17,19 @@ import {
   type AccessMode,
   type PlanCode,
 } from "./studioData";
-import { getStoredStudioSession } from "./studioAuth";
+import { refreshStudioSession } from "./studioAuth";
 
-function toman(value: number) {
-  return `${new Intl.NumberFormat("fa-IR").format(value)} تومان`;
+function toman(value: number, fa = true) {
+  return `${new Intl.NumberFormat(fa ? "fa-IR" : "en-US").format(value)} ${fa ? "تومان" : "toman"}`;
 }
 
-export default function StudioDashboard({ onClose, lang = "en" }: { onClose: () => void; lang?: string }) {
+export default function StudioDashboard({
+  onClose,
+  lang = "en",
+}: {
+  onClose: () => void;
+  lang?: string;
+}) {
   const fa = lang === "fa";
   const [profile, setProfile] = useState<StudioProfile | null>(null);
   const [subscriptions, setSubscriptions] = useState<StudioSubscription[]>([]);
@@ -33,159 +39,555 @@ export default function StudioDashboard({ onClose, lang = "en" }: { onClose: () 
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [buying, setBuying] = useState<PlanCode | null>(null);
+  const [billingReady, setBillingReady] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const actionLock = useRef(false);
   const user = getStudioUser();
 
-  const copy = useMemo(() => fa ? {
-    dashboard: "داشبورد حساب",
-    back: "بازگشت به استودیو",
-    account: "حساب کاربری",
-    plan: "اشتراک و دسترسی",
-    admin: "مدیریت کاربران",
-    save: "ذخیره تغییرات",
-    name: "نام نمایشی",
-    current: "وضعیت فعلی",
-    usage: "مصرف این هفته",
-    renders: "رندر",
-    unlimited: "نامحدود",
-    free: "دسترسی رایگان هنرمند",
-    buy: "خرید اشتراک",
-    pending: "در انتظار پرداخت",
-    noPayment: "درگاه پرداخت هنوز برای محیط آنلاین تنظیم نشده است.",
-    adminNote: "تغییرات سهمیه برای کاربر بعد از ذخیره اعمال می‌شود.",
-    user: "کاربر",
-    access: "دسترسی",
-    planLabel: "پلن",
-    limit: "سقف هفتگی",
-    saved: "ذخیره شد",
-    search: "جست‌وجوی کاربر",
-    allUsers: "همه کاربران",
-    resetUsage: "صفر کردن مصرف",
-    payments: "سوابق پرداخت",
-    noPayments: "هنوز سابقه پرداختی ثبت نشده است.",
-    usersCount: "کاربر",
-    freeCount: "دسترسی رایگان",
-    limitedCount: "محدود / پولی",
-  } : {
-    dashboard: "Account dashboard",
-    back: "Back to Studio",
-    account: "Account",
-    plan: "Subscription & access",
-    admin: "User management",
-    save: "Save changes",
-    name: "Display name",
-    current: "Current access",
-    usage: "This week",
-    renders: "renders",
-    unlimited: "Unlimited",
-    free: "Free artist access",
-    buy: "Buy plan",
-    pending: "Payment pending",
-    noPayment: "The payment gateway is not configured for the online environment yet.",
-    adminNote: "Quota changes apply to the user after saving.",
-    user: "User",
-    access: "Access",
-    planLabel: "Plan",
-    limit: "Weekly limit",
-    saved: "Saved",
-    search: "Search users",
-    allUsers: "All users",
-    resetUsage: "Reset usage",
-    payments: "Payment history",
-    noPayments: "No payment activity yet.",
-    usersCount: "Users",
-    freeCount: "Free access",
-    limitedCount: "Paid / limited",
-  }, [fa]);
+  const copy = useMemo(
+    () =>
+      fa
+        ? {
+            dashboard: "داشبورد حساب",
+            back: "بازگشت به استودیو",
+            account: "حساب کاربری",
+            plan: "اشتراک و دسترسی",
+            admin: "مدیریت کاربران",
+            save: "ذخیره تغییرات",
+            name: "نام نمایشی",
+            current: "وضعیت فعلی",
+            usage: "مصرف این هفته",
+            renders: "رندر",
+            unlimited: "نامحدود",
+            free: "دسترسی رایگان هنرمند",
+            buy: "خرید اشتراک",
+            pending: "در انتظار پرداخت",
+            noPayment: "درگاه پرداخت هنوز برای محیط آنلاین تنظیم نشده است.",
+            adminNote: "تغییرات سهمیه برای کاربر بعد از ذخیره اعمال می‌شود.",
+            user: "کاربر",
+            access: "دسترسی",
+            planLabel: "پلن",
+            limit: "سقف هفتگی",
+            saved: "ذخیره شد",
+            search: "جست‌وجوی کاربر",
+            allUsers: "همه کاربران",
+            resetUsage: "صفر کردن مصرف",
+            payments: "سوابق پرداخت",
+            noPayments: "هنوز سابقه پرداختی ثبت نشده است.",
+            usersCount: "کاربر",
+            freeCount: "دسترسی رایگان",
+            limitedCount: "محدود / پولی",
+          }
+        : {
+            dashboard: "Account dashboard",
+            back: "Back to Studio",
+            account: "Account",
+            plan: "Subscription & access",
+            admin: "User management",
+            save: "Save changes",
+            name: "Display name",
+            current: "Current access",
+            usage: "This week",
+            renders: "renders",
+            unlimited: "Unlimited",
+            free: "Free artist access",
+            buy: "Buy plan",
+            pending: "Payment pending",
+            noPayment:
+              "The payment gateway is not configured for the online environment yet.",
+            adminNote: "Quota changes apply to the user after saving.",
+            user: "User",
+            access: "Access",
+            planLabel: "Plan",
+            limit: "Weekly limit",
+            saved: "Saved",
+            search: "Search users",
+            allUsers: "All users",
+            resetUsage: "Reset usage",
+            payments: "Payment history",
+            noPayments: "No payment activity yet.",
+            usersCount: "Users",
+            freeCount: "Free access",
+            limitedCount: "Paid / limited",
+          },
+    [fa],
+  );
 
   async function load() {
     setBusy(true);
+    setMessage("");
     try {
-      const [nextProfile, nextSubscriptions] = await Promise.all([ensureMyProfile(), listSubscriptions()]);
+      const nextProfile = await ensureMyProfile();
+      if (!nextProfile)
+        throw new Error(
+          fa
+            ? "برای نمایش حساب دوباره وارد شوید."
+            : "Please sign in again to load your account.",
+        );
       setProfile(nextProfile);
-      setSubscriptions(nextSubscriptions);
-      setPaymentEvents(await listPaymentEvents().catch(() => []));
       setName(nextProfile?.display_name || "");
-      if (nextProfile?.role === "admin") setAdminUsers(await listAdminProfiles());
+      const results = await Promise.allSettled([
+        listSubscriptions(),
+        listPaymentEvents(),
+        nextProfile.role === "admin"
+          ? listAdminProfiles()
+          : Promise.resolve([]),
+      ]);
+      if (results[0].status === "fulfilled") setSubscriptions(results[0].value);
+      if (results[1].status === "fulfilled") setPaymentEvents(results[1].value);
+      if (results[2].status === "fulfilled") setAdminUsers(results[2].value);
+      const failed = results.find((result) => result.status === "rejected");
+      if (failed?.status === "rejected")
+        setMessage(
+          fa
+            ? "بخشی از اطلاعات بارگذاری نشد. دوباره تلاش کنید."
+            : "Some account information could not load. Please retry.",
+        );
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not load account data.");
-    } finally { setBusy(false); }
+      setMessage(
+        error instanceof Error ? error.message : "Could not load account data.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => {
+    dialog.current?.showModal();
+    void load();
+    void fetch("/api/billing/status", { signal: AbortSignal.timeout(10000) })
+      .then((r) => r.json())
+      .then((data) => setBillingReady(data.available === true))
+      .catch(() => setBillingReady(false));
+  }, []);
 
   async function saveName() {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setSaving(true);
+    setMessage("");
     try {
       const next = await updateMyDisplayName(name);
       setProfile(next);
       setMessage(copy.saved);
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not save."); }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save.");
+    } finally {
+      actionLock.current = false;
+      setSaving(false);
+    }
   }
 
   async function buy(code: PlanCode) {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setBuying(code);
     setMessage("");
     try {
-      const token = getStoredStudioSession()?.access_token;
-      const response = await fetch("/api/billing/payping/create", { method: "POST", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ planCode: code }) });
+      const token = (await refreshStudioSession())?.access_token;
+      const response = await fetch("/api/billing/payping/create", {
+        method: "POST",
+        signal: AbortSignal.timeout(30000),
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ planCode: code }),
+      });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.message || copy.noPayment);
       window.location.assign(payload.checkoutUrl);
-    } catch (error) { setMessage(error instanceof Error ? error.message : copy.noPayment); }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : copy.noPayment);
+    } finally {
+      actionLock.current = false;
+      setBuying(null);
+    }
   }
 
   async function saveAdmin(userId: string, patch: Partial<StudioProfile>) {
     try {
       const saved = await updateAdminProfile(userId, patch);
-      if (saved) setAdminUsers((users) => users.map((item) => item.user_id === userId ? saved : item));
+      if (saved)
+        setAdminUsers((users) =>
+          users.map((item) => (item.user_id === userId ? saved : item)),
+        );
+      if (saved?.user_id === user?.id) setProfile(saved);
       setMessage(copy.saved);
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not update user."); }
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Could not update user.",
+      );
+      throw error;
+    }
   }
 
   const filteredAdminUsers = adminUsers.filter((item) => {
     const query = adminQuery.trim().toLowerCase();
-    return !query || `${item.display_name || ""} ${item.user_id}`.toLowerCase().includes(query);
+    return (
+      !query ||
+      `${item.display_name || ""} ${item.email || ""} ${item.user_id}`.toLowerCase().includes(query)
+    );
   });
-  const freeUsers = adminUsers.filter((item) => item.access_mode === "free").length;
-  const limitedUsers = adminUsers.filter((item) => item.access_mode === "limited").length;
-  const dateLabel = (value: string) => new Intl.DateTimeFormat(fa ? "fa-IR" : "en-US", { dateStyle: "medium" }).format(new Date(value));
+  const freeUsers = adminUsers.filter(
+    (item) => item.access_mode === "free",
+  ).length;
+  const limitedUsers = adminUsers.filter(
+    (item) => item.access_mode === "limited",
+  ).length;
+  const dateLabel = (value: string) =>
+    new Intl.DateTimeFormat(fa ? "fa-IR" : "en-US", {
+      dateStyle: "medium",
+    }).format(new Date(value));
 
-  return <div className="studio-dashboard-backdrop" role="dialog" aria-modal="true" dir={fa ? "rtl" : "ltr"}>
-    <section className="studio-dashboard">
-      <header className="studio-dashboard__header">
-        <div className="studio-dashboard__title"><img src="/brand/vage-mark-white.png" alt="Vage Media" /><div><span>VAGE MEDIA / STUDIO</span><h2>{copy.dashboard}</h2></div></div>
-        <button className="studio-dialog-close" onClick={onClose} aria-label={copy.back}>×</button>
-      </header>
-      {busy ? <div className="studio-dashboard__loading">Loading account…</div> : <>
-        <div className="studio-dashboard__grid">
-          <article className="studio-dashboard__card studio-dashboard__card--account">
-            <span className="studio-dashboard__eyebrow">{copy.account}</span>
-            <h3>{user?.email || "Studio creator"}</h3>
-            <label>{copy.name}<input value={name} onChange={(event) => setName(event.target.value)} /></label>
-            <button className="studio-dashboard__button" onClick={saveName}>{copy.save}</button>
-          </article>
-          <article className="studio-dashboard__card studio-dashboard__card--usage">
-            <span className="studio-dashboard__eyebrow">{copy.current}</span>
-            <strong>{profile?.access_mode === "unlimited" ? copy.unlimited : profile?.access_mode === "free" ? copy.free : profile?.plan_code || "free"}</strong>
-            <p>{copy.usage}: {profile?.access_mode === "unlimited" || profile?.access_mode === "free" ? copy.unlimited : `${profile?.renders_used_week || 0} / ${profile?.render_limit || 0} ${copy.renders}`}</p>
-          </article>
-        </div>
-        <section className="studio-dashboard__section">
-          <div className="studio-dashboard__section-heading"><div><span className="studio-dashboard__eyebrow">{copy.plan}</span><h3>{fa ? "پلنی را برای تولید انتخاب کن" : "Choose a plan for your production"}</h3></div><span className="studio-dashboard__hint">{subscriptions[0]?.status === "pending" ? copy.pending : ""}</span></div>
-          <div className="studio-plan-grid">{studioPlans.map((plan) => <article className={`studio-plan ${profile?.plan_code === plan.code ? "is-current" : ""}`} key={plan.code}><span>{plan.title}</span><strong>{toman(plan.price)}</strong><p>{plan.note}</p><button className="studio-dashboard__button" onClick={() => buy(plan.code)}>{copy.buy}</button></article>)}</div>
-        </section>
-        <section className="studio-dashboard__section">
-          <div className="studio-dashboard__section-heading"><div><span className="studio-dashboard__eyebrow">{copy.payments}</span><h3>{fa ? "سوابق پرداخت و اشتراک" : "Subscription activity"}</h3></div></div>
-          {paymentEvents.length === 0 ? <p className="studio-dashboard__empty">{copy.noPayments}</p> : <div className="studio-payment-list">{paymentEvents.map((event) => <div className="studio-payment-row" key={event.id}><div><strong>{event.gateway.toUpperCase()}</strong><small>{dateLabel(event.created_at)} · {event.client_ref_id}</small></div><span>{event.status}</span><b>{toman(event.amount_toman)}</b></div>)}</div>}
-        </section>
-        {message && <p className="studio-dashboard__message" role="status">{message}</p>}
-        {profile?.role === "admin" && <section className="studio-dashboard__section studio-dashboard__section--admin"><div className="studio-dashboard__section-heading"><div><span className="studio-dashboard__eyebrow">{copy.admin}</span><h3>{fa ? "مرکز مدیریت دسترسی و سهمیه" : "Access and quota control"}</h3></div><span className="studio-dashboard__hint">{copy.adminNote}</span></div><div className="studio-admin-stats"><div><b>{adminUsers.length}</b><span>{copy.usersCount}</span></div><div><b>{freeUsers}</b><span>{copy.freeCount}</span></div><div><b>{limitedUsers}</b><span>{copy.limitedCount}</span></div></div><label className="studio-admin-search">{copy.search}<input value={adminQuery} onChange={(event) => setAdminQuery(event.target.value)} placeholder={copy.allUsers} /></label><div className="studio-users">{filteredAdminUsers.length ? filteredAdminUsers.map((item) => <AdminRow key={item.user_id} profile={item} copy={copy} onSave={saveAdmin} />) : <p className="studio-dashboard__empty">{copy.allUsers}</p>}</div></section>}
-      </>}
-      <footer className="studio-dashboard__footer"><button className="studio-dashboard__back" onClick={onClose}>← {copy.back}</button></footer>
-    </section>
-  </div>;
+  return (
+    <dialog
+      ref={dialog}
+      className="studio-account-dialog"
+      onCancel={onClose}
+      aria-labelledby="account-heading"
+      dir={fa ? "rtl" : "ltr"}
+    >
+      <section className="studio-dashboard">
+        <header className="studio-dashboard__header">
+          <div className="studio-dashboard__title">
+            <img src="/brand/vage-mark-white.png" alt="Vage Media" />
+            <div>
+              <span>VAGE MEDIA / STUDIO</span>
+              <h2 id="account-heading">{copy.dashboard}</h2>
+            </div>
+          </div>
+          <button
+            className="studio-dialog-close"
+            onClick={onClose}
+            aria-label={copy.back}
+          >
+            ×
+          </button>
+        </header>
+        <nav className="studio-account-nav" aria-label={copy.dashboard}>
+          <a href="#studio-account">{copy.account}</a>
+          <a href="#studio-plans">{copy.plan}</a>
+          <a href="#studio-payments">{copy.payments}</a>
+          {profile?.role === "admin" && (
+            <a href="#studio-admin">{copy.admin}</a>
+          )}
+          <button disabled={busy} onClick={() => void load()}>
+            {fa ? "بازخوانی اطلاعات" : "Refresh account"}
+          </button>
+        </nav>
+        {message && (
+          <p className="studio-dashboard__message" role="status">
+            {message}
+          </p>
+        )}
+        {busy ? (
+          <div className="studio-dashboard__loading">
+            {fa ? "در حال بارگذاری حساب…" : "Loading account…"}
+          </div>
+        ) : !profile ? (
+          <p role="alert">
+            {fa
+              ? "اطلاعات حساب در دسترس نیست؛ بازخوانی را بزنید."
+              : "Account information is unavailable. Use Refresh account to retry."}
+          </p>
+        ) : (
+          <>
+            <div className="studio-dashboard__grid">
+              <article
+                id="studio-account"
+                className="studio-dashboard__card studio-dashboard__card--account"
+              >
+                <span className="studio-dashboard__eyebrow">
+                  {copy.account}
+                </span>
+                <h3>{user?.email || "Studio creator"}</h3>
+                <label>
+                  {copy.name}
+                  <input
+                    maxLength={80}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                  />
+                </label>
+                <button
+                  className="studio-dashboard__button"
+                  disabled={
+                    saving || name.trim() === (profile.display_name || "")
+                  }
+                  onClick={saveName}
+                >
+                  {saving ? (fa ? "در حال ذخیره…" : "Saving…") : copy.save}
+                </button>
+                <small>
+                  {fa ? "نوع حساب: " : "Account role: "}
+                  {profile.role === "admin"
+                    ? fa
+                      ? "مدیر"
+                      : "Administrator"
+                    : copy.user}
+                </small>
+              </article>
+              <article className="studio-dashboard__card studio-dashboard__card--usage">
+                <span className="studio-dashboard__eyebrow">
+                  {copy.current}
+                </span>
+                <strong>
+                  {profile?.access_mode === "unlimited"
+                    ? copy.unlimited
+                    : profile?.access_mode === "free"
+                      ? copy.free
+                      : profile?.plan_code || "free"}
+                </strong>
+                <p>
+                  {copy.usage}:{" "}
+                  {profile?.access_mode === "unlimited" ||
+                  profile?.access_mode === "free"
+                    ? copy.unlimited
+                    : `${profile?.renders_used_week || 0} / ${profile?.render_limit || 0} ${copy.renders}`}
+                </p>
+              </article>
+            </div>
+            <section id="studio-plans" className="studio-dashboard__section">
+              <div className="studio-dashboard__section-heading">
+                <div>
+                  <span className="studio-dashboard__eyebrow">{copy.plan}</span>
+                  <h3>
+                    {fa
+                      ? "پلنی را برای تولید انتخاب کن"
+                      : "Choose a plan for your production"}
+                  </h3>
+                </div>
+                <span className="studio-dashboard__hint">
+                  {subscriptions[0]?.status === "pending" ? copy.pending : ""}
+                </span>
+              </div>
+              {!billingReady && (
+                <p className="studio-dashboard__hint">{copy.noPayment}</p>
+              )}
+              <div className="studio-plan-grid">
+                {studioPlans.map((plan) => (
+                  <article
+                    className={`studio-plan ${profile?.plan_code === plan.code ? "is-current" : ""}`}
+                    key={plan.code}
+                  >
+                    <span>{plan.title}</span>
+                    <strong>{toman(plan.price, fa)}</strong>
+                    <small>{fa ? "ماهیانه" : "per month"}</small>
+                    <p>{fa ? plan.note : `${plan.renders} renders per week`}</p>
+                    <button
+                      className="studio-dashboard__button"
+                      disabled={!billingReady || buying !== null}
+                      onClick={() => buy(plan.code)}
+                    >
+                      {buying === plan.code
+                        ? fa
+                          ? "اتصال به درگاه…"
+                          : "Opening checkout…"
+                        : copy.buy}
+                    </button>
+                  </article>
+                ))}
+              </div>
+              {subscriptions
+                .filter((s) => s.status === "active" && s.ends_at)
+                .map((s) => (
+                  <p key={s.id}>
+                    {s.plan_code} ·{" "}
+                    {fa ? "پایان اشتراک: " : "Subscription ends: "}
+                    {dateLabel(s.ends_at!)}
+                  </p>
+                ))}
+            </section>
+            <section id="studio-payments" className="studio-dashboard__section">
+              <div className="studio-dashboard__section-heading">
+                <div>
+                  <span className="studio-dashboard__eyebrow">
+                    {copy.payments}
+                  </span>
+                  <h3>
+                    {fa ? "سوابق پرداخت و اشتراک" : "Subscription activity"}
+                  </h3>
+                </div>
+              </div>
+              {paymentEvents.length === 0 ? (
+                <p className="studio-dashboard__empty">{copy.noPayments}</p>
+              ) : (
+                <div className="studio-payment-list">
+                  {paymentEvents.map((event) => (
+                    <div className="studio-payment-row" key={event.id}>
+                      <div>
+                        <strong>{event.gateway.toUpperCase()}</strong>
+                        <small>
+                          {dateLabel(event.created_at)} · {event.client_ref_id}
+                        </small>
+                      </div>
+                      <span>{event.status}</span>
+                      <b>{toman(event.amount_toman)}</b>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+            {profile?.role === "admin" && (
+              <section id="studio-admin" className="studio-dashboard__section studio-dashboard__section--admin">
+                <div className="studio-dashboard__section-heading">
+                  <div>
+                    <span className="studio-dashboard__eyebrow">
+                      {copy.admin}
+                    </span>
+                    <h3>
+                      {fa
+                        ? "مرکز مدیریت دسترسی و سهمیه"
+                        : "Access and quota control"}
+                    </h3>
+                  </div>
+                  <span className="studio-dashboard__hint">
+                    {copy.adminNote}
+                  </span>
+                </div>
+                <div className="studio-admin-stats">
+                  <div>
+                    <b>{adminUsers.length}</b>
+                    <span>{copy.usersCount}</span>
+                  </div>
+                  <div>
+                    <b>{freeUsers}</b>
+                    <span>{copy.freeCount}</span>
+                  </div>
+                  <div>
+                    <b>{limitedUsers}</b>
+                    <span>{copy.limitedCount}</span>
+                  </div>
+                </div>
+                <label className="studio-admin-search">
+                  {copy.search}
+                  <input
+                    value={adminQuery}
+                    onChange={(event) => setAdminQuery(event.target.value)}
+                    placeholder={copy.allUsers}
+                  />
+                </label>
+                <div className="studio-users">
+                  {filteredAdminUsers.length ? (
+                    filteredAdminUsers.map((item) => (
+                      <AdminRow
+                        key={item.user_id}
+                        profile={item}
+                        copy={copy}
+                        onSave={saveAdmin}
+                      />
+                    ))
+                  ) : (
+                    <p className="studio-dashboard__empty">{copy.allUsers}</p>
+                  )}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+        <footer className="studio-dashboard__footer">
+          <button className="studio-dashboard__back" onClick={onClose}>
+            ← {copy.back}
+          </button>
+        </footer>
+      </section>
+    </dialog>
+  );
 }
 
-function AdminRow({ profile, copy, onSave }: { profile: StudioProfile; copy: Record<string, string>; onSave: (userId: string, patch: Partial<StudioProfile>) => Promise<void> }) {
+function AdminRow({
+  profile,
+  copy,
+  onSave,
+}: {
+  profile: StudioProfile;
+  copy: Record<string, string>;
+  onSave: (userId: string, patch: Partial<StudioProfile>) => Promise<void>;
+}) {
   const [access, setAccess] = useState<AccessMode>(profile.access_mode);
   const [plan, setPlan] = useState<PlanCode>(profile.plan_code);
   const [limit, setLimit] = useState(String(profile.render_limit));
-  return <div className="studio-user-row"><div><strong>{profile.display_name || profile.user_id.slice(0, 8)}</strong><small>{profile.user_id}</small></div><label>{copy.access}<select value={access} onChange={(e) => setAccess(e.target.value as AccessMode)}><option value="limited">Limited</option><option value="free">Free</option><option value="unlimited">Unlimited</option></select></label><label>{copy.planLabel}<select value={plan} onChange={(e) => setPlan(e.target.value as PlanCode)}><option value="free">Free</option><option value="starter">Starter</option><option value="creator">Creator</option><option value="pro">Pro</option><option value="unlimited">Unlimited</option></select></label><label>{copy.limit}<input type="number" min={0} max={100000} value={limit} onChange={(e) => setLimit(e.target.value)} /></label><div className="studio-user-actions"><button className="studio-dashboard__button" onClick={() => onSave(profile.user_id, { access_mode: access, plan_code: plan, render_limit: Math.max(0, Number(limit) || 0) })}>{copy.save}</button><button className="studio-dashboard__button studio-dashboard__button--quiet" onClick={() => onSave(profile.user_id, { renders_used_week: 0 })}>{copy.resetUsage}</button></div><small className="studio-user-usage">{profile.renders_used_week} / {profile.render_limit}</small></div>;
+  const [pending, setPending] = useState(false);
+  const lock = useRef(false);
+  const [error, setError] = useState("");
+  const fa = copy.user === "کاربر";
+  useEffect(() => {
+    setAccess(profile.access_mode); setPlan(profile.plan_code); setLimit(String(profile.render_limit));
+  }, [profile]);
+  async function submit(reset = false) {
+    if (lock.current) return;
+    if (reset && !window.confirm(fa ? "مصرف هفتگی این کاربر صفر شود؟" : "Reset this user's weekly usage?")) return;
+    lock.current = true; setPending(true); setError("");
+    try { await onSave(profile.user_id, reset ? { renders_used_week: 0 } : { access_mode: access, plan_code: plan, render_limit: Number(limit) }); }
+    catch (e) { setError(e instanceof Error ? e.message : "Update failed"); }
+    finally { lock.current = false; setPending(false); }
+  }
+  return (
+    <fieldset className="studio-user-row" disabled={pending}>
+      <div>
+        <strong>{profile.display_name || profile.user_id.slice(0, 8)}</strong>
+        <small>{profile.user_id}</small>
+        <small dir="ltr">{profile.email}</small>
+      </div>
+      <label>
+        {copy.access}
+        <select
+          value={access}
+          onChange={(e) => setAccess(e.target.value as AccessMode)}
+        >
+          <option value="limited">Limited</option>
+          <option value="free">Free</option>
+          <option value="unlimited">Unlimited</option>
+        </select>
+      </label>
+      <label>
+        {copy.planLabel}
+        <select
+          value={plan}
+          onChange={(e) => {
+            const code = e.target.value as PlanCode;
+            setPlan(code); setAccess(code === "unlimited" ? "unlimited" : "limited");
+            setLimit(String(studioPlans.find(p => p.code === code)?.renders ?? (code === "unlimited" ? 100000 : 2)));
+          }}
+        >
+          <option value="free">Free</option>
+          <option value="starter">Starter</option>
+          <option value="creator">Creator</option>
+          <option value="pro">Pro</option>
+          <option value="unlimited">Unlimited</option>
+        </select>
+      </label>
+      <label>
+        {copy.limit}
+        <input
+          type="number"
+          min={0}
+          max={100000}
+          value={limit}
+          onChange={(e) => setLimit(e.target.value)}
+        />
+      </label>
+      <div className="studio-user-actions">
+        <button
+          className="studio-dashboard__button"
+          disabled={!Number.isInteger(Number(limit)) || Number(limit) < 0 || Number(limit) > 100000 || limit === ""}
+          onClick={() => void submit()}
+        >
+          {pending ? "…" : copy.save}
+        </button>
+        <button
+          className="studio-dashboard__button studio-dashboard__button--quiet"
+          onClick={() => void submit(true)}
+        >
+          {copy.resetUsage}
+        </button>
+      </div>
+      <small className="studio-user-usage">
+        {profile.access_mode === "limited" ? `${profile.renders_used_week} / ${profile.render_limit}` : copy.unlimited}
+      </small>
+      {error && <small role="alert">{error}</small>}
+    </fieldset>
+  );
 }
