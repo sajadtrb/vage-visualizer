@@ -33,6 +33,7 @@ export default function StudioDashboard({
   lang?: string;
 }) {
   const fa = lang === "fa";
+  const [dashboardTab, setDashboardTab] = useState<"overview" | "profile" | "plan" | "payments" | "security" | "admin">("overview");
   const [profile, setProfile] = useState<StudioProfile | null>(null);
   const [subscriptions, setSubscriptions] = useState<StudioSubscription[]>([]);
   const [paymentEvents, setPaymentEvents] = useState<StudioPaymentEvent[]>([]);
@@ -407,13 +408,22 @@ export default function StudioDashboard({
           </button>
         </header>
         <nav className="studio-account-nav" aria-label={copy.dashboard}>
-          <a href="#studio-account">{copy.account}</a>
-          <a href="#studio-plans">{copy.plan}</a>
-          <a href="#studio-payments">{copy.payments}</a>
-          <a href="#studio-security">{copy.security}</a>
-          {profile?.role === "admin" && (
-            <a href="#studio-admin">{copy.admin}</a>
-          )}
+          {([
+            ["overview", fa ? "نمای کلی" : "Overview"],
+            ["profile", fa ? "پروفایل" : "Profile"],
+            ["plan", copy.plan],
+            ["payments", copy.payments],
+            ["security", copy.security],
+            ...(profile?.role === "admin" ? [["admin", copy.admin]] : []),
+          ] as [typeof dashboardTab, string][]).map(([tab, label]) => (
+            <button
+              type="button"
+              key={tab}
+              className={dashboardTab === tab ? "is-active" : ""}
+              aria-current={dashboardTab === tab ? "page" : undefined}
+              onClick={() => setDashboardTab(tab)}
+            >{label}</button>
+          ))}
           <button disabled={busy} onClick={() => void load()}>
             {fa ? "بازخوانی اطلاعات" : "Refresh account"}
           </button>
@@ -435,7 +445,7 @@ export default function StudioDashboard({
           </p>
         ) : (
           <>
-            <div className="studio-dashboard__grid">
+            {(dashboardTab === "overview" || dashboardTab === "profile") && <div className={`studio-dashboard__grid ${dashboardTab === "profile" ? "is-profile-view" : ""}`}>
               <article
                 id="studio-account"
                 className="studio-dashboard__card studio-dashboard__card--account"
@@ -476,7 +486,7 @@ export default function StudioDashboard({
                   {profile.is_suspended ? copy.suspended : copy.active}
                 </small>
               </article>
-              <article className="studio-dashboard__card studio-dashboard__card--usage">
+              {dashboardTab === "overview" && <article className="studio-dashboard__card studio-dashboard__card--usage">
                 <span className="studio-dashboard__eyebrow">
                   {copy.current}
                 </span>
@@ -500,9 +510,9 @@ export default function StudioDashboard({
                     {dateLabel(new Date(new Date(profile.week_started_at).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString())}
                   </small>
                 )}
-              </article>
-            </div>
-            <section id="studio-plans" className="studio-dashboard__section">
+              </article>}
+            </div>}
+            {dashboardTab === "plan" && <section id="studio-plans" className="studio-dashboard__section">
               <div className="studio-dashboard__section-heading">
                 <div>
                   <span className="studio-dashboard__eyebrow">{copy.plan}</span>
@@ -552,8 +562,8 @@ export default function StudioDashboard({
                     {dateLabel(s.ends_at!)}
                   </p>
                 ))}
-            </section>
-            <section id="studio-payments" className="studio-dashboard__section">
+            </section>}
+            {dashboardTab === "payments" && <section id="studio-payments" className="studio-dashboard__section">
               <div className="studio-dashboard__section-heading">
                 <div>
                   <span className="studio-dashboard__eyebrow">
@@ -584,8 +594,8 @@ export default function StudioDashboard({
                   ))}
                 </div>
               )}
-            </section>
-            <section id="studio-security" className="studio-dashboard__section">
+            </section>}
+            {dashboardTab === "security" && <section id="studio-security" className="studio-dashboard__section">
               <div className="studio-dashboard__section-heading">
                 <div>
                   <span className="studio-dashboard__eyebrow">{copy.security}</span>
@@ -600,8 +610,8 @@ export default function StudioDashboard({
                 <button type="button" disabled={securityBusy || currentPassword.length === 0 || !newEmail.includes("@")} onClick={() => void updateAccountSecurity("email")}>{fa ? "درخواست تغییر ایمیل" : "Request email change"}</button>
               </div>
               {securityMessage && <p role="status" aria-live="polite">{securityMessage}</p>}
-            </section>
-            {profile?.role === "admin" && (
+            </section>}
+            {dashboardTab === "admin" && profile?.role === "admin" && (
               <section id="studio-admin" className="studio-dashboard__section studio-dashboard__section--admin">
                 <div className="studio-dashboard__section-heading">
                   <div>
@@ -749,8 +759,18 @@ function AdminRow({
     finally { lock.current = false; setPending(false); }
   }
   return (
-    <fieldset className="studio-user-row" disabled={pending}>
-      <div>
+    <details className="studio-user-details">
+      <summary className="studio-user-summary">
+        <span className="studio-user-summary__identity">
+          <strong>{profile.display_name || profile.user_id.slice(0, 8)}</strong>
+          <small dir="ltr">{profile.email}</small>
+        </span>
+        <span className="studio-user-summary__meta">{profile.plan_code}</span>
+        <span className="studio-user-summary__meta">{profile.access_mode === "limited" ? `${profile.renders_used_week} / ${profile.render_limit}` : copy.unlimited}</span>
+        <span className={`studio-user-summary__status ${profile.is_suspended ? "is-suspended" : ""}`}>{profile.is_suspended ? copy.suspended : copy.active}</span>
+      </summary>
+      <fieldset className="studio-user-row" disabled={pending}>
+      <div className="studio-user-metadata">
         <strong>{profile.display_name || profile.user_id.slice(0, 8)}</strong>
         <small>{profile.user_id}</small>
         <small dir="ltr">{profile.email}</small>
@@ -819,6 +839,7 @@ function AdminRow({
         {profile.access_mode === "limited" ? `${profile.renders_used_week} / ${profile.render_limit}` : copy.unlimited}
       </small>
       {error && <small role="alert">{error}</small>}
-    </fieldset>
+      </fieldset>
+    </details>
   );
 }

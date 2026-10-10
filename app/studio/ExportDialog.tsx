@@ -128,31 +128,8 @@ export default function ExportDialog({
             <option value="custom">Custom</option>
           </select>
         </label>
+        <p className="hint export-size-note">{t("Export dimensions can differ from the canvas; they do not resize your project.")}</p>
         <div className="field-grid">
-          <label className="field">
-            <span>{t("Width")}</span>
-            <input
-              aria-label="Export width"
-              type="number"
-              min={64}
-              max={3840}
-              step={2}
-              value={width}
-              onChange={(e) => setWidth(+e.target.value)}
-            />
-          </label>
-          <label className="field">
-            <span>{t("Height")}</span>
-            <input
-              aria-label="Export height"
-              type="number"
-              min={64}
-              max={3840}
-              step={2}
-              value={height}
-              onChange={(e) => setHeight(+e.target.value)}
-            />
-          </label>
           <label className="field">
             <span>{t("Frame rate")}</span>
             <select
@@ -212,16 +189,17 @@ export default function ExportDialog({
           {t("Use full music duration")}
         </button>
       </fieldset>
-      <label className="toggle-field field">
-        <span>{t("Constant frame-rate encoder (recommended)")}</span>
-        <input
-          aria-label="Compatibility encoder"
-          type="checkbox"
-          disabled={busy}
-          checked={compatibility}
-          onChange={(e) => setCompatibility(e.target.checked)}
-        />
-      </label>
+      <details className="advanced-settings export-advanced">
+        <summary>{t("Advanced export settings")}</summary>
+        <div className="field-grid">
+          <label className="field"><span>{t("Width")}</span><input aria-label={t("Export width")} type="number" min={64} max={3840} step={2} value={width} onChange={(e) => setWidth(+e.target.value)} /></label>
+          <label className="field"><span>{t("Height")}</span><input aria-label={t("Export height")} type="number" min={64} max={3840} step={2} value={height} onChange={(e) => setHeight(+e.target.value)} /></label>
+        </div>
+        <label className="toggle-field field">
+          <span>{t("Constant frame-rate encoder (recommended)")}</span>
+          <input aria-label={t("Compatibility encoder")} type="checkbox" disabled={busy} checked={compatibility} onChange={(e) => setCompatibility(e.target.checked)} />
+        </label>
+      </details>
       <div className="export-summary">
         <strong>{Math.max(0, end - start).toFixed(1)}s</strong>
         <span>
@@ -230,7 +208,7 @@ export default function ExportDialog({
       </div>
       <p className="hint">
         {t(
-          "Keep this tab visible. Recording takes the selected duration; conversion may take additional time.",
+          "Keep this tab open while local rendering and encoding finish.",
         )}
       </p>
       {progress && (

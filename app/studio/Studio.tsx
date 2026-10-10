@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from "react";
 import dynamic from "next/dynamic";
 import {
   Project,
@@ -108,6 +108,77 @@ type Drag = {
   corner: number;
 };
 
+type WorkspaceLayout = {
+  left: number;
+  right: number;
+  timeline: number;
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+};
+
+const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayout = {
+  left: 260,
+  right: 320,
+  timeline: 310,
+  leftCollapsed: false,
+  rightCollapsed: false,
+};
+
+function PanelResizeHandle({
+  axis,
+  value,
+  min,
+  max,
+  direction = 1,
+  label,
+  onChange,
+}: {
+  axis: "x" | "y";
+  value: number;
+  min: number;
+  max: number;
+  direction?: number;
+  label: string;
+  onChange: (value: number) => void;
+}) {
+  const gesture = useRef<{ position: number; value: number } | null>(null);
+  const coordinate = (event: ReactPointerEvent<HTMLButtonElement>) =>
+    axis === "x" ? event.clientX : event.clientY;
+  return (
+    <button
+      type="button"
+      className={`workspace-resize-handle workspace-resize-handle--${axis}`}
+      role="slider"
+      aria-label={label}
+      aria-orientation={axis === "x" ? "vertical" : "horizontal"}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={Math.round(value)}
+      title={label}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.setPointerCapture(event.pointerId);
+        gesture.current = { position: coordinate(event), value };
+      }}
+      onPointerMove={(event) => {
+        const start = gesture.current;
+        if (!start) return;
+        onChange(clamp(start.value + (coordinate(event) - start.position) * direction, min, max));
+      }}
+      onPointerUp={() => { gesture.current = null; }}
+      onPointerCancel={() => { gesture.current = null; }}
+      onKeyDown={(event) => {
+        const keys = axis === "x" ? ["ArrowLeft", "ArrowRight"] : ["ArrowUp", "ArrowDown"];
+        if (!keys.includes(event.key)) return;
+        event.preventDefault();
+        const physical = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : -1;
+        onChange(clamp(value + physical * direction * (event.shiftKey ? 48 : 12), min, max));
+      }}
+    />
+  );
+}
+
 function visibleLayerBounds(layer: Layer, project: Project) {
   if (layer.kind !== "text" || layer.settings.background) {
     return { w: layer.w, h: layer.h };
@@ -162,6 +233,10 @@ export default function Studio({
     [dragLayerId, setDragLayerId] = useState<string | null>(null),
     [dragOverLayerId, setDragOverLayerId] = useState<string | null>(null),
     [inspectorTab, setInspectorTab] = useState("Layer"),
+    [mobilePanel, setMobilePanel] = useState<"library" | "properties" | null>(null),
+    [workspaceLayout, setWorkspaceLayout] = useState(DEFAULT_WORKSPACE_LAYOUT),
+    [workspaceLayoutReady, setWorkspaceLayoutReady] = useState(false),
+    [quickStartDismissed, setQuickStartDismissed] = useState(false),
     [customCanvas, setCustomCanvas] = useState({
       width: "1280",
       height: "720",
@@ -196,6 +271,34 @@ export default function Studio({
   const canvasIsPreset = ["1920x1080", "1080x1920", "1080x1080"].includes(
     `${project.width}x${project.height}`,
   );
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("vage-studio-layout-v1");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<WorkspaceLayout>;
+        setWorkspaceLayout({
+          left: clamp(Number(parsed.left) || DEFAULT_WORKSPACE_LAYOUT.left, 210, 380),
+          right: clamp(Number(parsed.right) || DEFAULT_WORKSPACE_LAYOUT.right, 270, 430),
+          timeline: clamp(Number(parsed.timeline) || DEFAULT_WORKSPACE_LAYOUT.timeline, 190, 520),
+          leftCollapsed: parsed.leftCollapsed === true,
+          rightCollapsed: parsed.rightCollapsed === true,
+        });
+      }
+      setQuickStartDismissed(localStorage.getItem("vage-studio-quickstart-dismissed-v1") === "1");
+    } catch {
+      // Workspace preferences are optional; retain the in-memory defaults.
+    } finally {
+      setWorkspaceLayoutReady(true);
+    }
+  }, []);
+  useEffect(() => {
+    if (!workspaceLayoutReady) return;
+    try {
+      localStorage.setItem("vage-studio-layout-v1", JSON.stringify(workspaceLayout));
+    } catch {
+      // A full or disabled local storage must not interrupt editing.
+    }
+  }, [workspaceLayout, workspaceLayoutReady]);
   const update = (fn: (p: Project) => Project, remember = true) => {
     const previous = live.current;
     if (remember) {
@@ -1038,8 +1141,18 @@ export default function Studio({
           </button>
         </div>
       )}
-      <div className="studio-workspace">
-        <aside className="library-panel">
+      <div
+        className="studio-workspace"
+        style={{
+          "--library-width": workspaceLayout.leftCollapsed ? "48px" : `${workspaceLayout.left}px`,
+          "--inspector-width": workspaceLayout.rightCollapsed ? "48px" : `${workspaceLayout.right}px`,
+          "--timeline-height": `${workspaceLayout.timeline}px`,
+        } as CSSProperties}
+      >
+        <aside className={`library-panel ${workspaceLayout.leftCollapsed ? "is-collapsed" : ""} ${mobilePanel === "library" ? "mobile-open" : ""}`}>
+          <div className="panel-expand-rail">
+            <button type="button" title={t("Expand layers panel")} aria-label={t("Expand layers panel")} onClick={() => setWorkspaceLayout((v) => ({ ...v, leftCollapsed: false }))}>▤</button>
+          </div>
           <div className="library-tabs">
             {["Layers", "Media", "Templates"].map((name) => (
               <button
@@ -1050,6 +1163,8 @@ export default function Studio({
                 {t(name)}
               </button>
             ))}
+            <button className="panel-collapse-toggle" type="button" title={t("Collapse panel")} aria-label={t("Collapse layers panel")} onClick={() => setWorkspaceLayout((v) => ({ ...v, leftCollapsed: true }))}>‹</button>
+            <button className="panel-mobile-close" type="button" title={t("Close panel")} aria-label={t("Close panel")} onClick={() => setMobilePanel(null)}>×</button>
           </div>
           {tab === "Layers" && (
             <>
@@ -1058,13 +1173,6 @@ export default function Studio({
                 <span>{project.layers.length.toString().padStart(2, "0")}</span>
               </div>
               <div className="layer-stack">
-                <button onClick={() => add("effect")}>{t("Add effect layer")}</button>
-                <div aria-label="Layer order">
-                  <button disabled={!selectedLayer} onClick={() => order("front")}>⇈ {t("Front")}</button>
-                  <button disabled={!selectedLayer} onClick={() => order("up")}>↑ {t("Forward")}</button>
-                  <button disabled={!selectedLayer} onClick={() => order("down")}>↓ {t("Backward")}</button>
-                  <button disabled={!selectedLayer} onClick={() => order("back")}>⇊ {t("Back")}</button>
-                </div>
                 {[...project.layers].reverse().map((l) => (
                   <div
                     key={l.id}
@@ -1131,11 +1239,17 @@ export default function Studio({
                 ))}
               </div>
               <div className="add-layer-grid">
-                {(
-                  ["text", "spectrum", "particles", "background"] as Kind[]
-                ).map((k) => (
-                  <button key={k} onClick={() => add(k)}>
-                    {icons[k]} {t("Add " + k)}
+                {([
+                  ["text", () => add("text")],
+                  ["spectrum", () => add("spectrum")],
+                  ["particles", () => add("particles")],
+                  ["background", () => add("background")],
+                  ["image", () => setTab("Media")],
+                  ["logo", () => setTab("Media")],
+                  ["effect", () => add("effect")],
+                ] as [Kind, () => unknown][]).map(([kind, action]) => (
+                  <button key={kind} onClick={() => { action(); if (kind === "image" || kind === "logo") setMobilePanel("library"); }}>
+                    {icons[kind]} {t("Add " + kind)}
                   </button>
                 ))}
               </div>
@@ -1248,85 +1362,33 @@ export default function Studio({
             </>
           )}
         </aside>
+        <PanelResizeHandle
+          axis="x"
+          value={workspaceLayout.left}
+          min={210}
+          max={380}
+          direction={lang === "fa" ? -1 : 1}
+          label={t("Resize layers panel")}
+          onChange={(left) => setWorkspaceLayout((v) => ({ ...v, left }))}
+        />
         <section className="center-panel">
           <div className="stage-toolbar">
-            <div>
+            <div className="stage-format-chip">
               <span className="eyebrow">{t("Canvas")}</span>
-              <select
-                aria-label="Canvas format"
-                value={
-                  canvasIsPreset
-                    ? `${project.width}x${project.height}`
-                    : "custom"
-                }
-                onChange={(e) => {
-                  if (e.target.value === "custom") {
-                    // Enter custom mode with a useful editable starting size.
-                    setCustomCanvas({ width: "1280", height: "720" });
-                    changeCanvas(1280, 720);
-                    return;
-                  }
-                  const [w, h] = e.target.value.split("x").map(Number);
-                  changeCanvas(w, h);
-                }}
-              >
-                <option value="1920x1080">YouTube · 16:9</option>
-                <option value="1080x1920">Reel / Story · 9:16</option>
-                <option value="1080x1080">Square · 1:1</option>
-                <option value="custom">Custom canvas…</option>
-              </select>
-              {!canvasIsPreset && (
-                <div
-                  className="custom-canvas-fields"
-                  aria-label="Custom canvas size"
-                >
-                  <label>
-                    W
-                    <input
-                      aria-label="Canvas width"
-                      type="number"
-                      min={64}
-                      max={3840}
-                      step={2}
-                      value={customCanvas.width}
-                      onChange={(e) =>
-                        setCustomCanvas((v) => ({
-                          ...v,
-                          width: e.target.value,
-                        }))
-                      }
-                      onBlur={() => {
-                        const width = Number(customCanvas.width);
-                        if (Number.isFinite(width))
-                          changeCanvas(width, project.height);
-                      }}
-                    />
-                  </label>
-                  <span>×</span>
-                  <label>
-                    H
-                    <input
-                      aria-label="Canvas height"
-                      type="number"
-                      min={64}
-                      max={3840}
-                      step={2}
-                      value={customCanvas.height}
-                      onChange={(e) =>
-                        setCustomCanvas((v) => ({
-                          ...v,
-                          height: e.target.value,
-                        }))
-                      }
-                      onBlur={() => {
-                        const height = Number(customCanvas.height);
-                        if (Number.isFinite(height))
-                          changeCanvas(project.width, height);
-                      }}
-                    />
-                  </label>
-                </div>
-              )}
+              <button type="button" className="canvas-settings-button" onClick={() => {
+                setInspectorTab("Project");
+                setWorkspaceLayout((v) => ({ ...v, rightCollapsed: false }));
+                if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("properties");
+              }}>
+                {canvasIsPreset
+                  ? ({ "1920x1080": "YouTube · 16:9", "1080x1920": "Reel / Story · 9:16", "1080x1080": "Square · 1:1" } as Record<string, string>)[`${project.width}x${project.height}`]
+                  : t("Custom canvas")}
+                <small>{project.width} × {project.height}</small><span aria-hidden="true">⌄</span>
+              </button>
+            </div>
+            <div className="mobile-workspace-tools">
+              <button type="button" aria-expanded={mobilePanel === "library"} onClick={() => setMobilePanel(mobilePanel === "library" ? null : "library")}>{t("Library")}</button>
+              <button type="button" aria-expanded={mobilePanel === "properties"} onClick={() => { setWorkspaceLayout((v) => ({ ...v, rightCollapsed: false })); setMobilePanel(mobilePanel === "properties" ? null : "properties"); }}>{t("Inspector")}</button>
             </div>
             <div className="zoom-tools">
               <button
@@ -1344,14 +1406,41 @@ export default function Studio({
               >
                 +
               </button>
+              <button
+                className="layout-reset-button"
+                type="button"
+                title={t("Reset workspace layout")}
+                aria-label={t("Reset workspace layout")}
+                onClick={() => { setWorkspaceLayout(DEFAULT_WORKSPACE_LAYOUT); setMobilePanel(null); }}
+              >↺</button>
             </div>
           </div>
+          {!project.audio && !quickStartDismissed && (
+            <section className="quick-start" aria-label={t("Quick start")}>
+              <div><strong>{t("Start a visualizer")}</strong><span>{t("Choose a format, add music and artwork, tune layers, then preview and export.")}</span></div>
+              <button type="button" onClick={() => { setInspectorTab("Project"); setWorkspaceLayout((v) => ({ ...v, rightCollapsed: false })); if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("properties"); }}>{t("Choose canvas")}</button>
+              <button type="button" onClick={() => { setTab("Media"); if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("library"); }}>{t("Add music & artwork")}</button>
+              <button type="button" onClick={() => {
+                setTab("Layers");
+                const spectrum = project.layers.find((layer) => layer.kind === "spectrum");
+                if (spectrum) {
+                  setSelected([spectrum.id]);
+                  setInspectorTab("Layer");
+                } else {
+                  add("spectrum");
+                  setInspectorTab("Layer");
+                }
+                if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("properties");
+              }}>{t("Tune visualizer")}</button>
+              <button className="quick-start-close" type="button" aria-label={t("Dismiss guide")} title={t("Dismiss guide")} onClick={() => { setQuickStartDismissed(true); try { localStorage.setItem("vage-studio-quickstart-dismissed-v1", "1"); } catch { /* optional preference */ } }}>×</button>
+            </section>
+          )}
           <div className="stage-scroll">
             <div
               className="stage-frame"
               style={{
                 aspectRatio: `${project.width}/${project.height}`,
-                width: `min(${project.width / project.height < 1 ? "42" : "92"}%, ${project.width / project.height < 1 ? "360" : "1080"}px)`,
+                width: "auto",
                 transform: `scale(${zoom})`,
               }}
               ref={surface}
@@ -1363,7 +1452,7 @@ export default function Studio({
               <canvas
                 ref={canvas}
                 aria-label="Project preview"
-                onPointerDown={() => setSelected([])}
+                onPointerDown={() => { setSelected([]); setInspectorTab("Project"); }}
               />
               <div className="selection-overlay">
                 {project.layers
@@ -1426,6 +1515,15 @@ export default function Studio({
             <span>{t("Import music to bring your spectrum to life.")}</span>
             <span>VAGE / STUDIO</span>
           </div>
+          <PanelResizeHandle
+            axis="y"
+            value={workspaceLayout.timeline}
+            min={190}
+            max={520}
+            direction={-1}
+            label={t("Resize timeline")}
+            onChange={(timeline) => setWorkspaceLayout((v) => ({ ...v, timeline }))}
+          />
           <section className="timeline-bar">
             <div className="playback-row">
               <button
@@ -1496,6 +1594,7 @@ export default function Studio({
               />
             </div>
             <div className="trim-row">
+              <span className="timeline-context">{t("Project audio range")}</span>
               <label>
                 {t("Start")}
                 <input
@@ -1549,16 +1648,33 @@ export default function Studio({
               </button>
               <small>{project.export.fps} FPS</small>
             </div>
-            <LayerTimeline layers={project.layers} duration={project.end - project.start} time={time} selected={selected} onSelect={id => { setSelected([id]); setInspectorTab("Layer"); }} onChange={(id, motion, remember) => patchLayer(id, { motion }, remember)} onSeek={seek} t={t} />
+            <LayerTimeline layers={project.layers} duration={project.end - project.start} time={time} selected={selected} onSelect={id => { setSelected([id]); setInspectorTab("Layer"); if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("properties"); }} onChange={(id, motion, remember) => patchLayer(id, { motion }, remember)} onSeek={seek} t={t} />
           </section>
         </section>
-        <aside className="properties-panel">
+        <PanelResizeHandle
+          axis="x"
+          value={workspaceLayout.right}
+          min={270}
+          max={430}
+          direction={lang === "fa" ? 1 : -1}
+          label={t("Resize inspector panel")}
+          onChange={(right) => setWorkspaceLayout((v) => ({ ...v, right }))}
+        />
+        <aside className={`properties-panel ${workspaceLayout.rightCollapsed ? "is-collapsed" : ""} ${mobilePanel === "properties" ? "mobile-open" : ""}`}>
+          <div className="panel-expand-rail">
+            <button type="button" title={t("Expand inspector panel")} aria-label={t("Expand inspector panel")} onClick={() => setWorkspaceLayout((v) => ({ ...v, rightCollapsed: false }))}>⌖</button>
+          </div>
           <div className="library-tabs">
             <button
+              className={inspectorTab === "Project" ? "active" : ""}
+              onClick={() => setInspectorTab("Project")}
+            >{t("Project")}</button>
+            <button
               className={inspectorTab === "Layer" ? "active" : ""}
+              disabled={!selectedLayer}
               onClick={() => setInspectorTab("Layer")}
             >
-              {t("Inspector")}
+              {t("Layer")}
             </button>
             <button
               className={inspectorTab === "Effects" ? "active" : ""}
@@ -1566,13 +1682,47 @@ export default function Studio({
             >
               {t("Effects")}
             </button>
+            <button className="panel-collapse-toggle" type="button" title={t("Collapse panel")} aria-label={t("Collapse inspector panel")} onClick={() => setWorkspaceLayout((v) => ({ ...v, rightCollapsed: true }))}>›</button>
+            <button className="panel-mobile-close" type="button" title={t("Close panel")} aria-label={t("Close panel")} onClick={() => setMobilePanel(null)}>×</button>
           </div>
-          {inspectorTab === "Effects" ? (
+          {inspectorTab === "Project" || (!selectedLayer && inspectorTab === "Layer") ? (
+            <>
+              <div className="selected-heading project-heading">
+                <span>▧</span>
+                <div><small>{t("Project settings")}</small><strong>{project.name}</strong></div>
+              </div>
+              <section className="settings-card">
+                <h3>{t("Canvas & format")}</h3>
+                <label className="field"><span>{t("Social platform format")}</span>
+                  <select aria-label={t("Canvas format")} value={canvasIsPreset ? `${project.width}x${project.height}` : "custom"} onChange={(e) => {
+                    if (e.target.value === "custom") { setCustomCanvas({ width: "1280", height: "720" }); changeCanvas(1280, 720); return; }
+                    const [width, height] = e.target.value.split("x").map(Number); changeCanvas(width, height);
+                  }}>
+                    <option value="1920x1080">YouTube · 16:9</option>
+                    <option value="1080x1920">Reel / Story · 9:16</option>
+                    <option value="1080x1080">Square · 1:1</option>
+                    <option value="custom">{t("Custom canvas")}</option>
+                  </select>
+                </label>
+                {!canvasIsPreset ? <div className="custom-canvas-fields" aria-label={t("Custom canvas size")}>
+                  <label>W<input aria-label={t("Canvas width")} type="number" min={64} max={3840} step={2} value={customCanvas.width} onChange={(e) => setCustomCanvas((v) => ({ ...v, width: e.target.value }))} onBlur={() => { const width = Number(customCanvas.width); if (Number.isFinite(width)) changeCanvas(width, project.height); }} /></label>
+                  <span>×</span>
+                  <label>H<input aria-label={t("Canvas height")} type="number" min={64} max={3840} step={2} value={customCanvas.height} onChange={(e) => setCustomCanvas((v) => ({ ...v, height: e.target.value }))} onBlur={() => { const height = Number(customCanvas.height); if (Number.isFinite(height)) changeCanvas(project.width, height); }} /></label>
+                </div> : <p className="project-dimensions">{project.width} × {project.height} px · {t("Canvas dimensions")}</p>}
+                <p className="hint">{t("Changing format fits the composition proportionally; use Undo to return to the previous layout.")}</p>
+              </section>
+              <CompositionMotionControls project={project} onChange={(transitions) => update((p) => ({ ...p, transitions }))} t={t} />
+              <section className="settings-card project-effects-link">
+                <h3>{t("Project-wide effects")}</h3>
+                <p>{t("These settings affect the full composition. Effect layers affect the layers below them.")}</p>
+                <button className="wide-button" type="button" onClick={() => setInspectorTab("Effects")}>{t("Open global effects")}</button>
+              </section>
+            </>
+          ) : inspectorTab === "Effects" ? (
             <section className="settings-card">
-              <h3>{t("Effects")}</h3>
-              <p>{t("Effect layers affect the layers below them. Global effects affect the full composition.")}</p>
+              <h3>{t("Project-wide effects")}</h3>
+              <p>{t("These settings affect the full composition. Effect layers affect the layers below them.")}</p>
               <button onClick={() => { add("effect"); setInspectorTab("Layer"); }}>{t("Add effect layer")}</button>
-              <CompositionMotionControls project={project} onChange={transitions => update(p => ({ ...p, transitions }))} t={t} />
               {project.effects.style === "Strobe" && (
                 <p className="hint" role="note">
                   {lang === "fa"
@@ -1580,14 +1730,8 @@ export default function Studio({
                     : "Flashing-light effect. Use cautiously for photosensitive audiences."}
                 </p>
               )}
-              <SettingsFields
-                specs={effectsSpecs}
-                settings={project.effects}
-                onChange={(s) =>
-                  update((p) => ({ ...p, effects: { ...p.effects, ...s } }))
-                }
-                t={t}
-              />
+              <SettingsFields specs={effectsSpecs.slice(0, 4)} settings={project.effects} onChange={(s) => update((p) => ({ ...p, effects: { ...p.effects, ...s } }))} t={t} />
+              <details className="advanced-settings"><summary>{t("Advanced controls")}</summary><SettingsFields specs={effectsSpecs.slice(4)} settings={project.effects} onChange={(s) => update((p) => ({ ...p, effects: { ...p.effects, ...s } }))} t={t} /></details>
             </section>
           ) : selectedLayer ? (
             <>
@@ -1616,8 +1760,8 @@ export default function Studio({
                   {lang === "fa" ? "حذف رسانهٔ این لایه" : "Clear layer media"}
                 </button>
               )}
-              <section className="settings-card">
-                <h3>{t("Transform")}</h3>
+              <details className="settings-card inspector-accordion" open>
+                <summary>{t("Transform & position")}</summary>
                 <div className="field-grid">
                   {(["x", "y", "w", "h", "rotation"] as const).map((key) => (
                     <label className="field" key={key}>
@@ -1681,12 +1825,12 @@ export default function Studio({
                 >
                   {t("Reset transform")}
                 </button>
-              </section>
-              <section className="settings-card">
-                <h3>
+              </details>
+              <details className="settings-card inspector-accordion">
+                <summary>
                   {t("Alignment")}{" "}
                   {selected.length > 1 && `(${selected.length})`}
-                </h3>
+                </summary>
                 <div className="button-grid">
                   {[
                     ["left", "Left"],
@@ -1713,7 +1857,7 @@ export default function Studio({
                     </button>
                   ))}
                 </div>
-              </section>
+              </details>
               <div className="layer-actions">
                 <button onClick={duplicate}>{t("Duplicate")}</button>
                 <button
@@ -1728,11 +1872,12 @@ export default function Studio({
           ) : (
             <div className="inspector-empty">
               <span>⌖</span>
-              <h3>{t("Inspector")}</h3>
-              <p>{t("Select a layer to edit its properties.")}</p>
+              <h3>{t("Select a layer")}</h3>
+              <p>{t("Choose a layer from the list or select an object on the canvas.")}</p>
             </div>
           )}
         </aside>
+        {mobilePanel && <button className="panel-scrim" type="button" aria-label={t("Close panel")} onClick={() => setMobilePanel(null)} />}
       </div>
       {loading && (
         <div className="loading-toast" role="status">

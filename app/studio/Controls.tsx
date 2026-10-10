@@ -18,6 +18,7 @@ export type Spec = {
   max?: number;
   step?: number;
   options?: string[];
+  unit?: string;
 };
 export function Control({
   spec: s,
@@ -39,8 +40,8 @@ export function Control({
     >
       <span>
         {t(s.label)}
-        {!s.type && (
-          <output>{Number(value).toFixed((s.step || 1) < 1 ? 2 : 0)}</output>
+        {(!s.type || s.type === "number") && (
+          <output>{Number(value).toFixed((s.step || 1) < 1 ? 2 : 0)}{s.unit ? ` ${s.unit}` : ""}</output>
         )}
       </span>
       {s.type === "toggle" ? (
@@ -63,30 +64,54 @@ export function Control({
           ))}
         </select>
       ) : (
-        <input
-          {...accessible}
-          type={
-            s.type === "color"
-              ? "color"
-              : s.type === "number"
-                ? "number"
-                : "range"
-          }
-          min={s.min}
-          max={s.max}
-          step={s.step || 1}
-          value={s.type === "color" ? String(value) : Number(value)}
-          onChange={(e) => {
-            if (s.type === "color") onChange(e.target.value);
-            else {
-              const n = Number(e.target.value);
-              if (Number.isFinite(n))
-                onChange(
-                  Math.max(s.min ?? -Infinity, Math.min(s.max ?? Infinity, n)),
-                );
-            }
-          }}
-        />
+        s.type === "color" || s.type === "number" ? (
+          <input
+            {...accessible}
+            type={s.type}
+            min={s.min}
+            max={s.max}
+            step={s.step || 1}
+            value={s.type === "color" ? String(value) : Number(value)}
+            onChange={(e) => {
+              if (s.type === "color") onChange(e.target.value);
+              else {
+                const n = Number(e.target.value);
+                if (Number.isFinite(n))
+                  onChange(
+                    Math.max(s.min ?? -Infinity, Math.min(s.max ?? Infinity, n)),
+                  );
+              }
+            }}
+          />
+        ) : (
+          <div className="control-range-row">
+            <input
+              {...accessible}
+              type="range"
+              min={s.min}
+              max={s.max}
+              step={s.step || 1}
+              value={Number(value)}
+              onChange={(e) => onChange(Number(e.target.value))}
+            />
+            <input
+              className="control-range-number"
+              type="number"
+              aria-label={`${t(s.label)} value`}
+              min={s.min}
+              max={s.max}
+              step={s.step || 1}
+              value={Number(value)}
+              onChange={(e) => {
+                const n = Number(e.target.value);
+                if (e.target.value !== "" && Number.isFinite(n))
+                  onChange(
+                    Math.max(s.min ?? -Infinity, Math.min(s.max ?? Infinity, n)),
+                  );
+              }}
+            />
+          </div>
+        )
       )}
     </label>
   );
@@ -139,7 +164,7 @@ export const effectsSpecs: Spec[] = [
 ];
 const textSpecs: Spec[] = [
   { key: "color", label: "Text color", type: "color" },
-  { key: "size", label: "Font size", type: "number", min: 4, max: 400 },
+  { key: "size", label: "Font size", type: "number", min: 4, max: 400, unit: "px" },
   { key: "bold", label: "Bold", type: "toggle" },
   { key: "italic", label: "Italic", type: "toggle" },
   { key: "underline", label: "Underline", type: "toggle" },
@@ -156,15 +181,15 @@ const textSpecs: Spec[] = [
     type: "select",
     options: ["ltr", "rtl"],
   },
-  { key: "spacing", label: "Letter spacing", min: -5, max: 40, step: 0.1 },
-  { key: "lineHeight", label: "Line height", min: 0.5, max: 3, step: 0.05 },
-  { key: "shadow", label: "Shadow", min: 0, max: PERFORMANCE_LIMITS.textGlow },
-  { key: "glow", label: "Glow", min: 0, max: PERFORMANCE_LIMITS.textGlow },
-  { key: "outline", label: "Outline width", min: 0, max: 8, step: 0.5 },
+  { key: "spacing", label: "Letter spacing", min: -5, max: 40, step: 0.1, unit: "px" },
+  { key: "lineHeight", label: "Line height", min: 0.5, max: 3, step: 0.05, unit: "×" },
+  { key: "shadow", label: "Shadow", min: 0, max: PERFORMANCE_LIMITS.textGlow, unit: "px" },
+  { key: "glow", label: "Glow", min: 0, max: PERFORMANCE_LIMITS.textGlow, unit: "px" },
+  { key: "outline", label: "Outline width", min: 0, max: 8, step: 0.5, unit: "px" },
   { key: "outlineColor", label: "Outline color", type: "color" },
   { key: "background", label: "Text background", type: "toggle" },
   { key: "backgroundColor", label: "Background color", type: "color" },
-  { key: "padding", label: "Padding", min: 0, max: 100 },
+  { key: "padding", label: "Padding", min: 0, max: 100, unit: "px" },
   {
     key: "entrance",
     label: "Entrance",
@@ -177,7 +202,7 @@ const textSpecs: Spec[] = [
     type: "select",
     options: ["None", "Fade", "Slide up", "Zoom", "Typewriter"],
   },
-  { key: "duration", label: "Animation duration", min: 0.1, max: 5, step: 0.1 },
+  { key: "duration", label: "Animation duration", min: 0.1, max: 5, step: 0.1, unit: "s" },
   {
     key: "easing",
     label: "Easing",
@@ -194,11 +219,11 @@ const bgSpecs: Spec[] = [
   },
   { key: "color", label: "Background color", type: "color" },
   { key: "color2", label: "Gradient color", type: "color" },
-  { key: "blur", label: "Blur", min: 0, max: PERFORMANCE_LIMITS.backgroundBlur },
-  { key: "brightness", label: "Brightness", min: 0, max: 200 },
-  { key: "contrast", label: "Contrast", min: 0, max: 200 },
-  { key: "saturation", label: "Saturation", min: 0, max: 200 },
-  { key: "hue", label: "Hue", min: 0, max: 360 },
+  { key: "blur", label: "Blur", min: 0, max: PERFORMANCE_LIMITS.backgroundBlur, unit: "px" },
+  { key: "brightness", label: "Brightness", min: 0, max: 200, unit: "%" },
+  { key: "contrast", label: "Contrast", min: 0, max: 200, unit: "%" },
+  { key: "saturation", label: "Saturation", min: 0, max: 200, unit: "%" },
+  { key: "hue", label: "Hue", min: 0, max: 360, unit: "°" },
   { key: "vignette", label: "Vignette", min: 0, max: 1, step: 0.01 },
   { key: "grain", label: "Grain", min: 0, max: 1, step: 0.01 },
   { key: "overlay", label: "Overlay color", type: "color" },
@@ -229,6 +254,7 @@ const bgSpecs: Spec[] = [
     min: 0,
     max: 36000,
     step: 0.1,
+    unit: "s",
   },
   {
     key: "videoEnd",
@@ -237,6 +263,7 @@ const bgSpecs: Spec[] = [
     min: 0,
     max: 36000,
     step: 0.1,
+    unit: "s",
   },
   { key: "videoLoop", label: "Loop video", type: "toggle" },
 ];
@@ -245,10 +272,10 @@ const spectrumSpecs: Spec[] = [
   { key: "color", label: "Spectrum color", type: "color" },
   { key: "gradient", label: "Gradient", type: "toggle" },
   { key: "color2", label: "Gradient color", type: "color" },
-  { key: "gain", label: "Gain", min: 0, max: 8, step: 0.05 },
-  { key: "sensitivity", label: "Sensitivity", min: 0, max: 4, step: 0.05 },
-  { key: "reaction", label: "Music reaction", min: 0, max: 4, step: 0.05 },
-  { key: "bass", label: "Bass response", min: 0, max: 4, step: 0.05 },
+  { key: "gain", label: "Gain", min: 0, max: 8, step: 0.05, unit: "×" },
+  { key: "sensitivity", label: "Sensitivity", min: 0, max: 4, step: 0.05, unit: "×" },
+  { key: "reaction", label: "Music reaction", min: 0, max: 4, step: 0.05, unit: "×" },
+  { key: "bass", label: "Bass response", min: 0, max: 4, step: 0.05, unit: "×" },
   { key: "smoothing", label: "Smoothing", min: 0, max: 1, step: 0.01 },
   { key: "count", label: "Bar count", min: 16, max: PERFORMANCE_LIMITS.spectrumCount },
   { key: "gap", label: "Bar gap", min: 0, max: 0.9, step: 0.01 },
@@ -261,6 +288,7 @@ const spectrumSpecs: Spec[] = [
     type: "number",
     min: 20,
     max: 10000,
+    unit: "Hz",
   },
   {
     key: "maxFrequency",
@@ -268,6 +296,7 @@ const spectrumSpecs: Spec[] = [
     type: "number",
     min: 100,
     max: 20000,
+    unit: "Hz",
   },
   { key: "mirror", label: "Mirror frequencies", type: "toggle" },
   {
@@ -286,8 +315,8 @@ const particleSpecs: Spec[] = [
   },
   { key: "color", label: "Particle color", type: "color" },
   { key: "count", label: "Count", min: 1, max: PERFORMANCE_LIMITS.particleCount },
-  { key: "minSize", label: "Minimum size", min: 0.05, max: 10, step: 0.05 },
-  { key: "maxSize", label: "Maximum size", min: 0.05, max: 20, step: 0.05 },
+  { key: "minSize", label: "Minimum size", min: 0.05, max: 10, step: 0.05, unit: "%" },
+  { key: "maxSize", label: "Maximum size", min: 0.05, max: 20, step: 0.05, unit: "%" },
   { key: "glow", label: "Glow enabled", type: "toggle" },
   { key: "glowIntensity", label: "Glow intensity", min: 0, max: PERFORMANCE_LIMITS.particleGlow },
   { key: "blur", label: "Blur", min: 0, max: PERFORMANCE_LIMITS.particleBlur, step: 0.1 },
@@ -322,6 +351,12 @@ const particleSpecs: Spec[] = [
     step: 0.01,
   },
 ];
+const particleWindSpecs = particleSpecs.filter((spec) =>
+  ["direction", "strength", "windReaction"].includes(spec.key),
+);
+const particleAdvancedSpecs = particleSpecs
+  .slice(5)
+  .filter((spec) => !["wind", "direction", "strength", "windReaction"].includes(spec.key));
 export function LayerSettings({
   value,
   onChange,
@@ -332,6 +367,12 @@ export function LayerSettings({
   t: Translate;
 }) {
   const s = value.settings;
+  const advanced = (specs: Spec[]) => (
+    <details className="advanced-settings">
+      <summary>{t("Advanced controls")}</summary>
+      <SettingsFields specs={specs} settings={s} onChange={onChange} t={t} />
+    </details>
+  );
   return (
     <section className="settings-card">
       <h3>
@@ -399,39 +440,25 @@ export function LayerSettings({
               : "Make your sound visible."}
           </div>
           <SettingsFields
-            specs={textSpecs.slice(1, 10)}
+            specs={textSpecs.slice(1, 8)}
             settings={s}
             onChange={onChange}
             t={t}
           />
-          <details className="advanced-settings">
-            <summary>
-              {t("Advanced")} · {t("Appearance")}
-            </summary>
-            <SettingsFields
-              specs={textSpecs.slice(10, 17)}
-              settings={s}
-              onChange={onChange}
-              t={t}
-            />
-          </details>
+          {advanced(textSpecs.slice(8, 17))}
         </>
       )}
       {value.kind === "background" && (
-        <SettingsFields
-          specs={bgSpecs}
-          settings={s}
-          onChange={onChange}
-          t={t}
-        />
+        <>
+          <SettingsFields specs={bgSpecs.slice(0, 3)} settings={s} onChange={onChange} t={t} />
+          {advanced(bgSpecs.slice(3))}
+        </>
       )}
       {value.kind === "spectrum" && (
-        <SettingsFields
-          specs={spectrumSpecs}
-          settings={s}
-          onChange={onChange}
-          t={t}
-        />
+        <>
+          <SettingsFields specs={spectrumSpecs.slice(0, 5)} settings={s} onChange={onChange} t={t} />
+          {advanced(spectrumSpecs.slice(5))}
+        </>
       )}
       {value.kind === "particles" && (
         <>
@@ -439,7 +466,7 @@ export function LayerSettings({
             {t("Performance-safe limits are applied automatically to keep preview smooth.")}
           </p>
           <SettingsFields
-            specs={particleSpecs}
+            specs={particleSpecs.slice(0, 5)}
             settings={s}
             onChange={(patch) =>
               onChange(
@@ -450,6 +477,24 @@ export function LayerSettings({
             }
             t={t}
           />
+          <section className="particle-wind-controls" aria-label={t("Wind settings")}>
+            <h4>{t("Wind")}</h4>
+            <SettingsFields
+              specs={particleSpecs.filter((spec) => spec.key === "wind")}
+              settings={s}
+              onChange={onChange}
+              t={t}
+            />
+            <fieldset disabled={!s.wind}>
+              <SettingsFields
+                specs={particleWindSpecs}
+                settings={s}
+                onChange={onChange}
+                t={t}
+              />
+            </fieldset>
+          </section>
+          {advanced(particleAdvancedSpecs)}
           <button
             onClick={() =>
               onChange({ seed: Math.floor(Math.random() * 100000) })
@@ -496,7 +541,10 @@ export function LayerSettings({
           t={t}
         />
       )}
-      {value.kind === "effect" && <SettingsFields specs={effectsSpecs} settings={s} onChange={onChange} t={t} />}
+      {value.kind === "effect" && <>
+        <SettingsFields specs={effectsSpecs.slice(0, 4)} settings={s} onChange={onChange} t={t} />
+        {advanced(effectsSpecs.slice(4))}
+      </>}
     </section>
   );
 }

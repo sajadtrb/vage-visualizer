@@ -111,9 +111,9 @@ export default function StudioEntry() {
               {fa ? "ورود" : "Sign in"}
             </button>
           </div>
-          {!studioAuthConfigured && process.env.NODE_ENV !== "production" && (
+          {process.env.NODE_ENV !== "production" && (
             <button className="studio-entry__preview" onClick={() => setLocalPreview(true)}>
-              Continue local preview
+              {fa ? "ادامه در پیش‌نمایش محلی" : "Continue local preview"}
             </button>
           )}
           {!studioAuthConfigured && (
