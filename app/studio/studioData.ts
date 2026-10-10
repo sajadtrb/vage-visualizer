@@ -2,6 +2,7 @@
 
 import {
   getStoredStudioSession,
+  getStudioAuthClient,
   refreshStudioSession,
   type StudioSession,
 } from "./studioAuth";
@@ -14,6 +15,11 @@ export type PlanCode = "free" | "starter" | "creator" | "pro" | "unlimited";
 
 export type StudioProfile = {
   email?: string;
+  email_confirmed_at?: string | null;
+  last_sign_in_at?: string | null;
+  is_suspended?: boolean;
+  billing_exempt?: boolean;
+  access_expires_at?: string | null;
   user_id: string;
   display_name: string | null;
   role: "user" | "admin";
@@ -137,6 +143,15 @@ export async function getMyProfile() {
   return rows[0] || null;
 }
 
+/** Use Supabase Auth's server-verified identity for account and admin views. */
+export async function getVerifiedStudioUser() {
+  const auth = getStudioAuthClient()?.auth;
+  if (!auth) throw new Error("Studio sign-in is not configured in this environment.");
+  const { data, error } = await auth.getUser();
+  if (error) throw error;
+  return data.user;
+}
+
 export async function ensureMyProfile(displayName?: string) {
   const session = getStoredStudioSession();
   if (!session) return null;
@@ -198,9 +213,25 @@ export async function reserveStudioRender() {
   );
 }
 
-export async function listAdminProfiles() {
-  return rest<StudioProfile[]>(
-    "/rpc/list_studio_admin_users", { method: "POST", body: "{}" },
+export type StudioAdminFilters = {
+  role?: "user" | "admin";
+  plan?: PlanCode;
+  accessMode?: AccessMode;
+  suspended?: boolean;
+};
+
+export async function listAdminProfiles(query = "", limit = 50, offset = 0, filters: StudioAdminFilters = {}) {
+  return rest<{ items: StudioProfile[]; total: number }>(
+    "/rpc/studio_admin_search_users",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        p_query: query.trim() || null, p_limit: limit, p_offset: offset,
+        p_role: filters.role || null, p_plan: filters.plan || null,
+        p_access_mode: filters.accessMode || null,
+        p_suspended: filters.suspended ?? null,
+      }),
+    },
   );
 }
 
@@ -214,8 +245,12 @@ export async function updateAdminProfile(
       | "render_limit"
       | "display_name"
       | "renders_used_week"
+        | "is_suspended"
+        | "billing_exempt"
+        | "access_expires_at"
     >
   >,
+  reason: string,
 ) {
   if (
     patch.render_limit !== undefined &&
@@ -226,19 +261,37 @@ export async function updateAdminProfile(
     throw new Error(
       "Weekly limit must be a whole number between 0 and 100000.",
     );
-  const rows = await rest<StudioProfile[]>(
-    `/studio_profiles?user_id=eq.${encodeURIComponent(userId)}`,
+  if (reason.trim().length < 3 || reason.trim().length > 500)
+    throw new Error("Add a short reason (3–500 characters) for the admin change.");
+  const saved = await rest<StudioProfile>(
+    "/rpc/studio_admin_update_profile",
     {
-      method: "PATCH",
-      headers: { Prefer: "return=representation" },
-      body: JSON.stringify(patch),
+      method: "POST",
+      body: JSON.stringify({ p_user_id: userId, p_patch: patch, p_reason: reason.trim() }),
     },
   );
-  if (!rows[0])
+  if (!saved?.user_id)
     throw new Error(
       "No user was updated. Refresh your administrator access and try again.",
     );
-  return rows[0];
+  return saved;
+}
+
+export type StudioAdminAudit = {
+  id: number;
+  actor_user_id: string;
+  target_user_id: string;
+  reason: string;
+  before_state: Record<string, unknown>;
+  after_state: Record<string, unknown>;
+  created_at: string;
+};
+
+export async function listStudioAdminAudit(limit = 20) {
+  return rest<StudioAdminAudit[]>("/rpc/studio_admin_list_audit", {
+    method: "POST",
+    body: JSON.stringify({ p_user_id: null, p_limit: limit, p_offset: 0 }),
+  });
 }
 
 export function getStudioUser() {

@@ -1,5 +1,7 @@
 "use client";
 
+import { createClient, type Session } from "@supabase/supabase-js";
+
 const url = process.env.NEXT_PUBLIC_STUDIO_SUPABASE_URL?.replace(/\/$/, "");
 const key = process.env.NEXT_PUBLIC_STUDIO_SUPABASE_ANON_KEY;
 const storageKey = "vage-studio-auth";
@@ -9,231 +11,97 @@ export const studioAuthConfigured = Boolean(url && key);
 export type StudioUser = {
   id: string;
   email?: string;
+  email_confirmed_at?: string;
   user_metadata?: Record<string, unknown>;
 };
-export type StudioSession = {
-  access_token: string;
-  refresh_token?: string;
-  expires_at?: number;
-  user: StudioUser;
-};
-type AuthEvent = "SIGNED_IN" | "SIGNED_OUT" | "TOKEN_REFRESHED";
-type Listener = (event: AuthEvent, session: StudioSession | null) => void;
-const listeners = new Set<Listener>();
-let refreshInFlight: Promise<StudioSession | null> | null = null;
 
-function storedSession() {
+export type StudioSession = Session & { user: StudioUser };
+
+type AuthLanguage = "fa" | "en";
+
+let client: ReturnType<typeof createClient> | null = null;
+
+/**
+ * Keep the existing storage key so existing Studio sessions survive the SDK
+ * migration. supabase-js serializes the same access/refresh token fields and
+ * coordinates refreshes across tabs with its supported storage locking.
+ */
+export function getStudioAuthClient() {
+  if (!studioAuthConfigured || typeof window === "undefined") return null;
+  if (!client) {
+    client = createClient(url!, key!, {
+      auth: {
+        storageKey,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+        flowType: "pkce",
+      },
+    });
+  }
+  return client;
+}
+
+export function getStoredStudioSession(): StudioSession | null {
   if (typeof window === "undefined") return null;
   try {
-    return JSON.parse(
-      localStorage.getItem(storageKey) || "null",
-    ) as StudioSession | null;
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { currentSession?: StudioSession } & StudioSession;
+    // Accept both the old hand-written shape and the SDK's persisted shape.
+    const session = (parsed.currentSession || parsed) as StudioSession;
+    return session?.access_token && session?.user?.id ? session : null;
   } catch {
     return null;
   }
 }
 
-export function getStoredStudioSession() {
-  return storedSession();
-}
-
-function setStoredSession(session: StudioSession | null, event: AuthEvent) {
-  if (typeof window !== "undefined") {
-    if (session) localStorage.setItem(storageKey, JSON.stringify(session));
-    else localStorage.removeItem(storageKey);
-  }
-  listeners.forEach((listener) => listener(event, session));
-}
-
-class AuthRequestError extends Error {
-  constructor(
-    message: string,
-    readonly status: number,
-  ) {
-    super(message);
-  }
-}
-
-async function refreshStoredSession(force = false) {
-  const current = storedSession();
-  if (!current?.refresh_token || !url || !key) return current;
-  if (
-    !force &&
-    current.expires_at &&
-    current.expires_at > Math.floor(Date.now() / 1000) + 90
-  )
-    return current;
-  if (refreshInFlight) return refreshInFlight;
-  refreshInFlight = authRequest("/token?grant_type=refresh_token", {
-    refresh_token: current.refresh_token,
-  })
-    .then((payload) => {
-      const next = sessionFromPayload(payload);
-      if (!next)
-        throw new Error(
-          "The authentication service returned no refreshed session.",
-        );
-      // Do not revive a session that was signed out while the request was running.
-      if (storedSession()?.refresh_token !== current.refresh_token)
-        return storedSession();
-      setStoredSession(next, "TOKEN_REFRESHED");
-      return next;
-    })
-    .catch((error: unknown) => {
-      // Network outages and server failures must not discard the user's session.
-      if (
-        error instanceof AuthRequestError &&
-        [400, 401, 403].includes(error.status) &&
-        storedSession()?.refresh_token === current.refresh_token
-      ) {
-        setStoredSession(null, "SIGNED_OUT");
-        return null;
-      }
-      return storedSession();
-    })
-    .finally(() => {
-      refreshInFlight = null;
-    });
-  return refreshInFlight;
-}
-
-async function validateStoredSession(session: StudioSession | null) {
-  if (!session || !url || !key) return session;
-  try {
-    const response = await fetch(`${url}/auth/v1/user`, {
-      signal: AbortSignal.timeout(10000),
-      headers: {
-        apikey: key,
-        Authorization: `Bearer ${session.access_token}`,
-      },
-    });
-    if (response.ok) return session;
-    if ([401, 403].includes(response.status)) {
-      if (storedSession()?.access_token === session.access_token)
-        setStoredSession(null, "SIGNED_OUT");
-      return null;
-    }
-  } catch {
-    // Keep the session during transient offline/network failures.
-  }
-  return session;
-}
-
 export async function refreshStudioSession(force = false) {
-  return refreshStoredSession(force);
-}
-
-async function authRequest(path: string, body: Record<string, unknown>) {
-  if (!url || !key) throw new Error("Studio authentication is not configured.");
-  const response = await fetch(`${url}/auth/v1${path}`, {
-    method: "POST",
-    signal: AbortSignal.timeout(15000),
-    headers: { apikey: key, "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const detail = payload.error_description || payload.msg || payload.message;
-    throw new AuthRequestError(
-      typeof detail === "string" ? detail : "Authentication failed.",
-      response.status,
-    );
+  const auth = getStudioAuthClient()?.auth;
+  if (!auth) return null;
+  try {
+    const result = force ? await auth.refreshSession() : await auth.getSession();
+    if (result.error) return getStoredStudioSession();
+    return (result.data.session as StudioSession | null) || null;
+  } catch {
+    // A temporary outage must not erase local work. Online APIs still validate
+    // the bearer token independently and will refuse an expired session.
+    return getStoredStudioSession();
   }
-  return payload as Record<string, unknown>;
 }
 
-function sessionFromPayload(payload: Record<string, unknown>) {
-  if (!payload.access_token || !payload.user) return null;
-  const expiresIn =
-    typeof payload.expires_in === "number" ? payload.expires_in : 3600;
-  return {
-    access_token: String(payload.access_token),
-    refresh_token:
-      typeof payload.refresh_token === "string"
-        ? payload.refresh_token
-        : undefined,
-    expires_at: Math.floor(Date.now() / 1000) + expiresIn,
-    user: payload.user as StudioUser,
-  } satisfies StudioSession;
-}
+export function getFriendlyAuthError(error: unknown, language: AuthLanguage) {
+  const fa = language === "fa";
+  const value = error as { message?: unknown; code?: unknown; status?: unknown };
+  const code = String(value?.code || "").toLowerCase();
+  const message = String(value?.message || error || "").toLowerCase();
+  const status = Number(value?.status || 0);
 
-export function getStudioAuthClient() {
-  if (!studioAuthConfigured) return null;
-  return {
-    auth: {
-      async getSession() {
-        return {
-          data: {
-            session: await validateStoredSession(await refreshStoredSession()),
-          },
-        };
-      },
-      onAuthStateChange(listener: Listener) {
-        listeners.add(listener);
-        return {
-          data: {
-            subscription: { unsubscribe: () => listeners.delete(listener) },
-          },
-        };
-      },
-      async signUp({
-        email,
-        password,
-        options,
-      }: {
-        email: string;
-        password: string;
-        options?: { data?: Record<string, unknown> };
-      }) {
-        const redirect =
-          typeof window !== "undefined"
-            ? `?redirect_to=${encodeURIComponent(window.location.origin)}`
-            : "";
-        const payload = await authRequest(`/signup${redirect}`, {
-          email,
-          password,
-          data: options?.data || {},
-        });
-        const session = sessionFromPayload(payload);
-        if (session) setStoredSession(session, "SIGNED_IN");
-        return {
-          data: {
-            session,
-            user: (payload.user as StudioUser | undefined) || null,
-          },
-          error: null,
-        };
-      },
-      async signInWithPassword({
-        email,
-        password,
-      }: {
-        email: string;
-        password: string;
-      }) {
-        const payload = await authRequest("/token?grant_type=password", {
-          email,
-          password,
-        });
-        const session = sessionFromPayload(payload);
-        if (!session)
-          throw new Error("The authentication service returned no session.");
-        setStoredSession(session, "SIGNED_IN");
-        return { data: { session, user: session.user }, error: null };
-      },
-      async signOut() {
-        const session = storedSession();
-        setStoredSession(null, "SIGNED_OUT");
-        if (url && key && session?.access_token)
-          await fetch(`${url}/auth/v1/logout`, {
-            method: "POST",
-            signal: AbortSignal.timeout(10000),
-            headers: {
-              apikey: key,
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          }).catch(() => undefined);
-      },
-    },
-  };
+  if (/fetch|network|timeout|failed to connect|load failed/.test(message))
+    return fa
+      ? "اتصال به سرویس ورود برقرار نشد. اینترنت و دسترسی به Supabase را بررسی کنید و دوباره تلاش کنید. پروژه‌ی محلی شما پاک نشده است."
+      : "Could not reach the sign-in service. Check your connection and try again. Your local project is still saved.";
+  if (code.includes("email_not_confirmed") || message.includes("email not confirmed"))
+    return fa
+      ? "ایمیل شما هنوز تأیید نشده است. ایمیل تأیید را باز کنید یا درخواست ارسال دوباره بدهید."
+      : "Your email is not confirmed yet. Open the confirmation email or request another one.";
+  if (["invalid_credentials", "invalid_grant"].includes(code) || /invalid login credentials|invalid password/.test(message))
+    return fa ? "ایمیل یا رمز عبور درست نیست." : "The email or password is incorrect.";
+  if (status === 429 || /rate.?limit|too many requests|over_request_rate_limit/.test(message))
+    return fa
+      ? "تعداد درخواست‌ها زیاد بوده است. چند دقیقه صبر کنید و دوباره تلاش کنید."
+      : "Too many attempts. Wait a few minutes and try again.";
+  if (status === 401 || /jwt expired|refresh token.*(invalid|not found)|session.*expired/.test(message))
+    return fa
+      ? "نشست ورود منقضی شده است. دوباره وارد شوید؛ پروژه‌های محلی شما باقی می‌مانند."
+      : "Your sign-in session expired. Sign in again; your local projects remain saved.";
+  if (/user already registered|already been registered/.test(message))
+    return fa ? "برای این ایمیل قبلاً حساب ساخته شده است؛ وارد شوید." : "An account already exists for this email. Sign in instead.";
+  if (/password should be|password.*(weak|short)/.test(message))
+    return fa ? "رمز عبور باید دست‌کم ۸ نویسه داشته باشد و به‌اندازه‌ی کافی قوی باشد." : "Choose a stronger password with at least 8 characters.";
+  if (status >= 500)
+    return fa
+      ? "سرویس ورود موقتاً پاسخ‌گو نیست. کمی بعد دوباره تلاش کنید."
+      : "The sign-in service is temporarily unavailable. Please try again shortly.";
+  return fa ? "درخواست انجام نشد. اطلاعات را بررسی و دوباره تلاش کنید." : "The request could not be completed. Check the details and try again.";
 }
