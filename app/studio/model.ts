@@ -1,6 +1,26 @@
 export type Kind =
   "background" | "image" | "text" | "spectrum" | "particles" | "logo" | "effect";
 export type Settings = Record<string, string | number | boolean>;
+export type Transition = {
+  style: string;
+  duration: number;
+  delay: number;
+  easing: string;
+  direction: string;
+  distance: number;
+  scale: number;
+  angle: number;
+  blur: number;
+  opacity: number;
+  strips: number;
+  reveal: string;
+};
+export type LayerMotion = {
+  start: number;
+  end: number | null;
+  entrance: Transition;
+  exit: Transition;
+};
 export type Layer = {
   id: string;
   name: string;
@@ -15,6 +35,7 @@ export type Layer = {
   locked: boolean;
   asset?: string;
   settings: Settings;
+  motion?: LayerMotion;
 };
 export type Project = {
   version: 2;
@@ -31,6 +52,7 @@ export type Project = {
   end: number;
   loop: boolean;
   effects: Settings;
+  transitions?: { intro: Transition; outro: Transition };
   export: {
     fps: number;
     quality: string;

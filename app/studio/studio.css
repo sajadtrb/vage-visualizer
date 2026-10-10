@@ -541,6 +541,31 @@ small,
   padding: 9px 10px;
   font-size: 10px;
 }
+.motion-numbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.motion-error { color: #ffb09d; font-size: 12px; margin: 8px 0; }
+.motion-controls > button { margin: 5px 5px 5px 0; }
+.motion-transition summary { padding: 10px 0; cursor: pointer; }
+.motion-transition select, .motion-transition input { max-width: 100%; }
+.layer-timeline { margin-top: 12px; font-size: 12px; }
+.layer-timeline summary { cursor: pointer; padding: 8px 0; }
+.layer-timeline summary small { color: var(--muted); margin-inline-start: 12px; }
+.layer-time-rows { max-height: 174px; overflow: auto; padding: 5px 8px 5px 0; }
+.layer-time-row { display: grid; grid-template-columns: 115px minmax(0, 1fr); align-items: center; gap: 8px; min-height: 34px; }
+.layer-time-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: start; font-size: 11px; border: 0; background: transparent; padding: 4px; }
+.layer-time-track { position: relative; height: 27px; background: #0c1019; border-radius: 4px; }
+.layer-time-clip { position: absolute; height: 25px; top: 1px; background: #343247; border: 1px solid #5e577d; border-radius: 4px; }
+.selected .layer-time-clip { border-color: #ae9bff; }
+.layer-time-body { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0 9px; background: transparent; border: 0; font-size: 10px; overflow: hidden; white-space: nowrap; cursor: grab; touch-action: none; }
+.layer-time-handle { position: absolute; top: -2px; width: 10px; height: 27px; padding: 0; border: 0; background: #b9a5ff; opacity: .8; cursor: ew-resize; touch-action: none; z-index: 2; }
+.layer-time-handle.start { left: -2px; border-radius: 4px 0 0 4px; }
+.layer-time-handle.end { right: -2px; border-radius: 0 4px 4px 0; }
+.layer-time-in, .layer-time-out { position: absolute; top: 0; height: 100%; pointer-events: none; background: linear-gradient(90deg, #8d70d988, transparent); }
+.layer-time-out { background: linear-gradient(90deg, transparent, #e7a06488); }
+.layer-motion-handle { position: absolute; top: 3px; width: 8px; height: 19px; padding: 0; border: 1px solid #e5dcff; border-radius: 3px; background: #a98aff; cursor: ew-resize; touch-action: none; z-index: 3; transform: translateX(-50%); }
+.layer-motion-handle.exit { background: #e6a06d; border-color: #ffe1bd; transform: translateX(50%); }
+.layer-motion-handle:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.layer-time-playhead { position: absolute; top: 0; bottom: 0; width: 1px; background: #c2ff62; pointer-events: none; z-index: 3; }
+@media (max-width: 600px) { .layer-time-row { grid-template-columns: 80px minmax(0, 1fr); } .layer-timeline summary small { display: block; margin: 4px 0; } }
 .center-panel {
   min-width: 0;
   min-height: 0;

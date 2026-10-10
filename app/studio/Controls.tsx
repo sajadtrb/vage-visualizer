@@ -415,17 +415,6 @@ export function LayerSettings({
               t={t}
             />
           </details>
-          <details className="advanced-settings">
-            <summary>
-              {t("Entrance")} / {t("Exit")}
-            </summary>
-            <SettingsFields
-              specs={textSpecs.slice(17)}
-              settings={s}
-              onChange={onChange}
-              t={t}
-            />
-          </details>
         </>
       )}
       {value.kind === "background" && (

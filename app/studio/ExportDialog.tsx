@@ -56,7 +56,7 @@ export default function ExportDialog({
       if (onReserveRender) await onReserveRender();
       onSettings({ fps, quality, width, height, start, end });
       const blob = await exportMP4(
-        { ...project, start, end, export: { fps, quality, width, height } },
+        { ...project, export: { fps, quality, width, height, start, end } },
         analysis,
         controller.signal,
         setProgress,

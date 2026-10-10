@@ -57,7 +57,12 @@ export async function exportMP4(
   forceFallback = false,
 ) {
   const start = performance.now();
-  const duration = project.end - project.start;
+  const rangeStart = project.export.start ?? project.start;
+  const rangeEnd = project.export.end ?? project.end;
+  const duration = rangeEnd - rangeStart;
+  const timeOffset = rangeStart - project.start;
+  if (rangeStart < project.start || rangeEnd > project.end)
+    throw Error("Choose an export range inside the project timeline.");
   const width = project.export.width ?? project.width,
     height = project.export.height ?? project.height;
   // Keep design-space font sizes and effects consistent across output resolutions.
@@ -183,10 +188,10 @@ export async function exportMP4(
     await Promise.all(
       project.layers
         .filter((l) => l.asset && media.videos.has(l.asset))
-        .map((l) => media.seek(l.asset!, videoTime(l, 0, media))),
+        .map((l) => media.seek(l.asset!, videoTime(l, timeOffset, media))),
     );
     const paintFrame = (time: number) => {
-      renderScene(renderCanvas, scene, media, time, analysis, scratch);
+      renderScene(renderCanvas, scene, media, time + timeOffset, analysis, scratch);
       outputContext.clearRect(0, 0, width, height);
       outputContext.drawImage(renderCanvas, 0, 0, width, height);
     };
@@ -234,7 +239,7 @@ export async function exportMP4(
           await Promise.all(
             project.layers
               .filter((l) => l.asset && media.videos.has(l.asset))
-              .map((l) => media.seek(l.asset!, videoTime(l, time, media))),
+              .map((l) => media.seek(l.asset!, videoTime(l, time + timeOffset, media))),
           );
           paintFrame(time);
           const frameBlob = await new Promise<Blob>((resolve, reject) =>
@@ -301,7 +306,7 @@ export async function exportMP4(
       if (analysis) {
         await encoder.writeFile(
           "audio.wav",
-          pcmWav(analysis.buffer, project.start, duration),
+          pcmWav(analysis.buffer, rangeStart, duration),
         );
         muxArgs.push("-i", "audio.wav");
       }
@@ -383,10 +388,10 @@ export async function exportMP4(
         recorder!.start(1000);
         source?.start(
           0,
-          project.start,
+          rangeStart,
           Math.min(
             duration,
-            Math.max(0, analysis!.buffer.duration - project.start),
+            Math.max(0, analysis!.buffer.duration - rangeStart),
           ),
         );
         for (const layer of project.layers) {
@@ -408,7 +413,7 @@ export async function exportMP4(
               project.layers.forEach((l) => {
                 const v = l.asset ? media.videos.get(l.asset) : undefined;
                 if (v) {
-                  const expected = videoTime(l, t, media);
+                  const expected = videoTime(l, t + timeOffset, media);
                   if (Math.abs(v.currentTime - expected) > 0.2 && !v.seeking)
                     v.currentTime = expected;
                   if (v.paused && v.loop) v.play().catch(reject);

@@ -39,6 +39,8 @@ import {
 import { loadFonts } from "./fonts";
 import { fa } from "./i18n";
 import LegacyBackup from "./LegacyBackup";
+import LayerTimeline from "./LayerTimeline";
+import { LayerMotionControls, CompositionMotionControls } from "./MotionControls";
 import StudioDashboard from "./StudioDashboard";
 import { reserveStudioRender } from "./studioData";
 import { getStoredStudioSession } from "./studioAuth";
@@ -411,10 +413,10 @@ export default function Studio({
     const draw = (now: number) => {
       const p = live.current;
       let current = clock.current;
-      if (playingRef.current && audioContext.current) {
+      if (playingRef.current) {
         current =
           audioOffset.current +
-          audioContext.current.currentTime -
+          (analysisRef.current && audioContext.current ? audioContext.current.currentTime : performance.now() / 1000) -
           audioStart.current;
         if (current >= p.end - p.start) {
           if (p.loop) {
@@ -487,9 +489,17 @@ export default function Studio({
   );
   const startPlayback = async (offset: number) => {
     const a = analysisRef.current;
-    if (!a) return;
     audioNode.current?.stop();
     audioNode.current = null;
+    if (!a) {
+      const p = live.current;
+      audioOffset.current = clamp(offset, 0, Math.max(0, p.end - p.start - 0.01));
+      audioStart.current = performance.now() / 1000;
+      clock.current = audioOffset.current;
+      playingRef.current = true;
+      setPlaying(true);
+      return;
+    }
     if (!audioContext.current) audioContext.current = new AudioContext();
     await audioContext.current.resume();
     const ctx = audioContext.current;
@@ -1421,7 +1431,7 @@ export default function Studio({
               <button
                 className="play-button"
                 aria-label={playing ? "Pause" : "Play"}
-                disabled={!analysis || !!loading}
+                disabled={!!loading}
                 onClick={() =>
                   playing ? pause() : safely(() => startPlayback(time))
                 }
@@ -1539,6 +1549,7 @@ export default function Studio({
               </button>
               <small>{project.export.fps} FPS</small>
             </div>
+            <LayerTimeline layers={project.layers} duration={project.end - project.start} time={time} selected={selected} onSelect={id => { setSelected([id]); setInspectorTab("Layer"); }} onChange={(id, motion, remember) => patchLayer(id, { motion }, remember)} onSeek={seek} t={t} />
           </section>
         </section>
         <aside className="properties-panel">
@@ -1561,11 +1572,7 @@ export default function Studio({
               <h3>{t("Effects")}</h3>
               <p>{t("Effect layers affect the layers below them. Global effects affect the full composition.")}</p>
               <button onClick={() => { add("effect"); setInspectorTab("Layer"); }}>{t("Add effect layer")}</button>
-              <SettingsFields specs={[
-                { key: "intro", label: "Intro", type: "select", options: ["None", "Fade", "Open horizontal", "Open vertical"] },
-                { key: "outro", label: "Outro", type: "select", options: ["None", "Fade", "Open horizontal", "Open vertical"] },
-                { key: "transitionDuration", label: "Transition duration", min: 0.1, max: 5, step: 0.1 },
-              ]} settings={project.effects} onChange={s => update(p => ({ ...p, effects: { ...p.effects, ...s } }))} t={t} />
+              <CompositionMotionControls project={project} onChange={transitions => update(p => ({ ...p, transitions }))} t={t} />
               {project.effects.style === "Strobe" && (
                 <p className="hint" role="note">
                   {lang === "fa"
@@ -1598,6 +1605,7 @@ export default function Studio({
                 </div>
               </div>
               <LayerSettings value={selectedLayer} onChange={settings} t={t} />
+              <LayerMotionControls key={selectedLayer.id} layer={selectedLayer} duration={project.end - project.start} onChange={motion => patchLayer(selectedLayer.id, { motion })} t={t} />
               {selectedLayer.asset && (
                 <button
                   className="wide-button"

@@ -1,12 +1,36 @@
 import { Layer, Project, num, str, clamp, PERFORMANCE_LIMITS } from "./model";
 import { Features, silence, AudioAnalysis } from "./audio";
 import { MediaLibrary } from "./media";
+import { applyTransition, ease, layerMotion, needsIsolation, projectTransitions, sampleMotion } from "./motion";
 export const rand = (i: number, seed = 42) => {
   const x = Math.sin(i * 127.1 + seed * 311.7) * 43758.5453;
   return x - Math.floor(x);
 };
 const tau = Math.PI * 2;
 const effectBuffers = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+const motionBuffers = new WeakMap<HTMLCanvasElement, HTMLCanvasElement>();
+const textUnits = new Map<string, string[]>();
+function revealUnits(text: string, words: boolean) {
+  const boundedText = text.slice(0, 4096);
+  const key = `${words}:${boundedText}`;
+  let units = textUnits.get(key);
+  if (!units) {
+    if (typeof Intl.Segmenter === "function") {
+      units = Array.from(new Intl.Segmenter(undefined, { granularity: words ? "word" : "grapheme" }).segment(boundedText), s => s.segment).slice(0, 512);
+    } else {
+      units = (words ? (boundedText.match(/\S+\s*/g) || []) : Array.from(boundedText)).slice(0, 512);
+    }
+    if (textUnits.size >= 64) textUnits.delete(textUnits.keys().next().value!);
+    textUnits.set(key, units);
+  }
+  return units;
+}
+function motionBuffer(canvas: HTMLCanvasElement) {
+  let buffer = motionBuffers.get(canvas);
+  if (!buffer) { buffer = document.createElement("canvas"); motionBuffers.set(canvas, buffer); }
+  if (buffer.width !== canvas.width || buffer.height !== canvas.height) { buffer.width = canvas.width; buffer.height = canvas.height; }
+  return buffer;
+}
 function path(c: CanvasRenderingContext2D, p: number[][], close = false) {
   c.beginPath();
   p.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
@@ -364,31 +388,7 @@ function text(
     fs = num(s, "size", 64);
   let t = str(s, "text");
   if (s.uppercase) t = t.toUpperCase();
-  const entrance = str(s, "entrance"),
-    exit = str(s, "exit"),
-    d = Math.max(0.05, num(s, "duration", 1));
-  let a = clamp(time / d, 0, 1),
-    b = clamp((duration - time) / d, 0, 1);
-  const easing = str(s, "easing");
-  if (easing === "Ease out") {
-    a = 1 - (1 - a) ** 3;
-    b = 1 - (1 - b) ** 3;
-  } else if (easing === "Ease in") {
-    a **= 3;
-    b **= 3;
-  }
-  const animate = (name: string, v: number) => {
-    if (name === "Fade") c.globalAlpha *= v;
-    if (name === "Slide up") c.translate(0, (1 - v) * h);
-    if (name === "Zoom") {
-      c.translate(w / 2, h / 2);
-      c.scale(0.5 + v * 0.5, 0.5 + v * 0.5);
-      c.translate(-w / 2, -h / 2);
-    }
-    if (name === "Typewriter") t = t.slice(0, Math.ceil(t.length * v));
-  };
-  animate(entrance, a);
-  animate(exit, b);
+  const reveal = sampleMotion(layerMotion(l), time, duration).samples.find(a => a.transition.style === "Text reveal");
   c.font = `${s.italic ? "italic " : ""}${s.bold ? "700" : "400"} ${fs}px "${str(s, "font", "Inter")}"`;
   c.textBaseline = "middle";
   c.textAlign = str(s, "align", "center") as CanvasTextAlign;
@@ -412,6 +412,18 @@ function text(
   c.fillStyle = str(s, "color", "#fff");
   lines.forEach((lineText, i) => {
     const y = h / 2 + (i - (lines.length - 1) / 2) * line;
+    c.save();
+    if (reveal) {
+      const units = revealUnits(lineText, reveal.transition.reveal === "Words");
+      const amount = clamp(ease(reveal.progress, reveal.transition.easing), 0, 1);
+      const count = Math.ceil(units.length * amount);
+      const reverse = reveal.transition.direction === "Right";
+      const visible = (reverse ? units.slice(units.length - count) : units.slice(0, count)).join("");
+      const fullWidth = c.measureText(lineText).width;
+      const shownWidth = count === 0 ? 0 : c.measureText(visible).width;
+      const left = c.textAlign === "center" ? x - fullWidth / 2 : c.textAlign === "right" ? x - fullWidth : x;
+      c.beginPath(); c.rect(reverse !== (c.direction === "rtl") ? left + fullWidth - shownWidth : left, y - line / 2, shownWidth, line); c.clip();
+    }
     if (num(s, "outline")) {
       c.strokeStyle = str(s, "outlineColor", "#000");
       c.lineWidth = num(s, "outline");
@@ -428,6 +440,7 @@ function text(
             : x;
       c.fillRect(left, y + fs * 0.5, width, Math.max(1, fs / 25));
     }
+    c.restore();
   });
 }
 export type LogoData = { path: string; hex: string };
@@ -817,15 +830,23 @@ export function renderScene(
   c.rect(0, 0, p.width, p.height);
   c.clip();
   const f = analysis?.at(time + p.start) || silence();
+  const main = c;
   for (const l of [
     ...p.layers.filter((l) => l.kind === "background"),
     ...p.layers.filter((l) => l.kind !== "background"),
   ]) {
     if (!l.visible || l.opacity <= 0) continue;
+    const motion = sampleMotion(layerMotion(l), time, p.end - p.start);
+    if (!motion.visible) continue;
     if (l.kind === "effect") {
-      if (scratch) effects(c, { ...p, effects: { ...l.settings, blend: num(l.settings, "blend", 0.6) * l.opacity } }, time, f, scratch);
+      const alpha = motion.samples.reduce((a, s) => a * (s.transition.opacity + (1 - s.transition.opacity) * clamp(ease(s.progress, s.transition.easing), 0, 1)), 1);
+      if (scratch) effects(main, { ...p, effects: { ...l.settings, blend: num(l.settings, "blend", 0.6) * l.opacity * alpha } }, time, f, scratch);
       continue;
     }
+    const animated = motion.samples.some(s => needsIsolation(s.transition.style));
+    const buffer = animated ? motionBuffer(canvas) : null;
+    const c = buffer ? buffer.getContext("2d")! : main;
+    if (buffer) { c.setTransform(canvas.width / p.width, 0, 0, canvas.height / p.height, 0, 0); c.clearRect(0, 0, p.width, p.height); }
     // Particles are a canvas-wide simulation. Backgrounds use their own
     // transform, just like every other visual layer, so imported media can be
     // moved and resized without being silently stretched to the canvas.
@@ -840,6 +861,7 @@ export function renderScene(
     );
     c.rotate((l.rotation * Math.PI) / 180);
     c.translate(-w / 2, -h / 2);
+    for (const sample of motion.samples) applyTransition(c, sample.transition, sample.progress, w, h, "geometry");
     if (l.kind === "background") background(c, l, w, h, time, media);
     else if (l.kind === "image" && l.asset) {
       const img = media.images.get(l.asset);
@@ -874,25 +896,24 @@ export function renderScene(
     else if (l.kind === "particles") particles(c, l, w, h, time, f);
     else if (l.kind === "logo") logo(c, l, w, h);
     c.restore();
+    if (buffer) {
+      main.save();
+      if (l.kind === "spectrum") main.globalCompositeOperation = str(l.settings, "blend", "source-over") as GlobalCompositeOperation;
+      for (const sample of motion.samples) applyTransition(main, sample.transition, sample.progress, w, h, "appearance");
+      main.drawImage(buffer, 0, 0, p.width, p.height);
+      main.restore();
+    }
   }
   if (scratch) effects(c, p, time, f, scratch);
-  // Composition transitions share the same timeline in preview and export.
-  const duration = p.end - p.start;
-  const transition = (name: string, progress: number) => {
-    if (!name || name === "None" || progress >= 1) return;
-    const v = clamp(progress, 0, 1);
-    c.save(); c.fillStyle = "#000";
-    if (name === "Open horizontal") {
-      c.fillRect(0, 0, p.width * (1-v)/2, p.height);
-      c.fillRect(p.width * (1+v)/2, 0, p.width, p.height);
-    } else if (name === "Open vertical") {
-      c.fillRect(0, 0, p.width, p.height * (1-v)/2);
-      c.fillRect(0, p.height * (1+v)/2, p.width, p.height);
-    } else { c.globalAlpha = 1-v; c.fillRect(0,0,p.width,p.height); }
-    c.restore();
-  };
-  const td = Math.min(Math.max(0.1, num(p.effects, "transitionDuration", 1)), duration/2);
-  transition(str(p.effects, "intro"), time/td);
-  transition(str(p.effects, "outro"), (duration-time)/td);
+  const transitions = projectTransitions(p);
+  const motion = sampleMotion({ start: 0, end: null, entrance: transitions.intro, exit: transitions.outro }, time, p.end - p.start);
+  if (motion.samples.length) {
+    const buffer = motionBuffer(canvas), bc = buffer.getContext("2d")!;
+    bc.setTransform(1, 0, 0, 1, 0, 0); bc.clearRect(0, 0, buffer.width, buffer.height); bc.drawImage(canvas, 0, 0);
+    c.fillStyle = "#000"; c.fillRect(0, 0, p.width, p.height);
+    c.save();
+    for (const sample of motion.samples) applyTransition(c, sample.transition, sample.progress, p.width, p.height);
+    c.drawImage(buffer, 0, 0, p.width, p.height); c.restore();
+  }
   c.restore();
 }
