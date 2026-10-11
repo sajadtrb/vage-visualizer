@@ -284,11 +284,15 @@ function particles(
     style = str(s, "style"),
     speed = num(s, "speed", 0.25),
     reaction = num(s, "reaction", 1),
+    audioTravel = s.sync === false ? 0 : f.travel,
+    bass = s.sync === false ? 0 : f.bass,
+    mid = s.sync === false ? 0 : f.mid,
+    treble = s.sync === false ? 0 : f.treble,
     color = str(s, "color", "#fff"),
-    travel = time * speed + f.travel * reaction * 4;
+    travel = time * speed + audioTravel * reaction * 4;
   const wind = s.wind
       ? num(s, "strength", 0.5) *
-        (time + f.travel * num(s, "windReaction", 1) * 5)
+        (time + audioTravel * num(s, "windReaction", 1) * 5)
       : 0,
     dir = str(s, "direction", "right"),
     r = num(s, "random", 1),
@@ -325,10 +329,10 @@ function particles(
               ? Math.cos(a * 3) * wind * 40
               : 0);
     if (style === "Wave particles")
-      y += Math.sin((x / w) * tau + travel) * f.mid * reaction * h * 0.15;
+      y += Math.sin((x / w) * tau + travel) * mid * reaction * h * 0.15;
     if (style === "Radial particles" || style === "Star field") {
-      x *= 1 + f.bass * num(s, "bass", 1) * reaction;
-      y *= 1 + f.bass * reaction;
+      x *= 1 + bass * num(s, "bass", 1) * reaction;
+      y *= 1 + bass * reaction;
     }
     return [
       (((x + w / 2) % w) + w) % w,
@@ -360,8 +364,8 @@ function particles(
     c.globalAlpha =
       l.opacity *
       (0.35 + rand(i + 10, seed) * 0.5) *
-      (1 + f.treble * num(s, "treble", 1) * reaction);
-    let radius = size * (1 + f.bass * num(s, "bass", 1) * reaction * 0.3);
+      (1 + treble * num(s, "treble", 1) * reaction);
+    let radius = size * (1 + bass * num(s, "bass", 1) * reaction * 0.3);
     if (style === "Bokeh" || style === "Orbs" || style === "Nebula") {
       radius *= style === "Nebula" ? 20 : style === "Bokeh" ? 6 : 3;
       const g = c.createRadialGradient(x, y, 0, x, y, Math.max(0.1, radius));

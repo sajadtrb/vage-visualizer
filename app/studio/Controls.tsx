@@ -317,6 +317,7 @@ const particleSpecs: Spec[] = [
   { key: "count", label: "Count", min: 1, max: PERFORMANCE_LIMITS.particleCount },
   { key: "minSize", label: "Minimum size", min: 0.05, max: 10, step: 0.05, unit: "%" },
   { key: "maxSize", label: "Maximum size", min: 0.05, max: 20, step: 0.05, unit: "%" },
+  { key: "sync", label: "Sync to music", type: "toggle" },
   { key: "glow", label: "Glow enabled", type: "toggle" },
   { key: "glowIntensity", label: "Glow intensity", min: 0, max: PERFORMANCE_LIMITS.particleGlow },
   { key: "blur", label: "Blur", min: 0, max: PERFORMANCE_LIMITS.particleBlur, step: 0.1 },
@@ -355,7 +356,7 @@ const particleWindSpecs = particleSpecs.filter((spec) =>
   ["direction", "strength", "windReaction"].includes(spec.key),
 );
 const particleAdvancedSpecs = particleSpecs
-  .slice(5)
+  .slice(6)
   .filter((spec) => !["wind", "direction", "strength", "windReaction"].includes(spec.key));
 export function LayerSettings({
   value,
@@ -466,7 +467,7 @@ export function LayerSettings({
             {t("Performance-safe limits are applied automatically to keep preview smooth.")}
           </p>
           <SettingsFields
-            specs={particleSpecs.slice(0, 5)}
+            specs={particleSpecs.slice(0, 6)}
             settings={s}
             onChange={(patch) =>
               onChange(

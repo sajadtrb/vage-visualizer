@@ -248,6 +248,7 @@ export function layer(kind: Kind, id: string): Layer {
       glowIntensity: 6,
       blur: 0,
       speed: 0.25,
+      sync: true,
       wind: false,
       direction: "right",
       strength: 0.5,
@@ -376,6 +377,9 @@ export function normalizeProject(p: Project): Project {
           h: 100,
           settings: {
             ...l.settings,
+            // Older projects had audio reactivity always enabled. Preserve that
+            // behavior unless the user explicitly disables music sync.
+            sync: l.settings.sync !== false,
             count: clamp(
               Math.round(finite(l.settings.count, 100)),
               1,
