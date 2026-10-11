@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 import {
   Layer,
   Settings,
@@ -20,6 +21,35 @@ export type Spec = {
   options?: string[];
   unit?: string;
 };
+export function NumericInput({ value, onCommit, min, max, step = 1, className, id, ariaLabel }: {
+  value: number;
+  onCommit: (value: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  className?: string;
+  id?: string;
+  ariaLabel?: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commit = () => {
+    const parsed = Number(draft);
+    if (!draft.trim() || !Number.isFinite(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+    const next = Math.max(min ?? -Infinity, Math.min(max ?? Infinity, parsed));
+    setDraft(String(next));
+    if (next !== value) onCommit(next);
+  };
+  return <input id={id} className={className} aria-label={ariaLabel} type="number" min={min} max={max} step={step}
+    value={draft} onChange={(event) => setDraft(event.target.value)} onBlur={commit}
+    onKeyDown={(event) => {
+      if (event.key === "Enter") event.currentTarget.blur();
+      if (event.key === "Escape") setDraft(String(value));
+    }} />;
+}
 export function Control({
   spec: s,
   value,
@@ -64,25 +94,15 @@ export function Control({
           ))}
         </select>
       ) : (
-        s.type === "color" || s.type === "number" ? (
+        s.type === "color" ? (
           <input
             {...accessible}
-            type={s.type}
-            min={s.min}
-            max={s.max}
-            step={s.step || 1}
-            value={s.type === "color" ? String(value) : Number(value)}
-            onChange={(e) => {
-              if (s.type === "color") onChange(e.target.value);
-              else {
-                const n = Number(e.target.value);
-                if (Number.isFinite(n))
-                  onChange(
-                    Math.max(s.min ?? -Infinity, Math.min(s.max ?? Infinity, n)),
-                  );
-              }
-            }}
+            type="color"
+            value={String(value)}
+            onChange={(e) => onChange(e.target.value)}
           />
+        ) : s.type === "number" ? (
+          <NumericInput id={id} ariaLabel={t(s.label)} value={Number(value)} min={s.min} max={s.max} step={s.step || 1} onCommit={onChange} />
         ) : (
           <div className="control-range-row">
             <input
@@ -94,22 +114,7 @@ export function Control({
               value={Number(value)}
               onChange={(e) => onChange(Number(e.target.value))}
             />
-            <input
-              className="control-range-number"
-              type="number"
-              aria-label={`${t(s.label)} value`}
-              min={s.min}
-              max={s.max}
-              step={s.step || 1}
-              value={Number(value)}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                if (e.target.value !== "" && Number.isFinite(n))
-                  onChange(
-                    Math.max(s.min ?? -Infinity, Math.min(s.max ?? Infinity, n)),
-                  );
-              }}
-            />
+            <NumericInput className="control-range-number" ariaLabel={`${t(s.label)} value`} value={Number(value)} min={s.min} max={s.max} step={s.step || 1} onCommit={onChange} />
           </div>
         )
       )}

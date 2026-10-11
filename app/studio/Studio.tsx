@@ -32,6 +32,7 @@ import { renderScene, videoTime } from "./renderer";
 import { logos } from "./logos";
 import {
   Control,
+  NumericInput,
   LayerSettings,
   SettingsFields,
   effectsSpecs,
@@ -218,6 +219,7 @@ export default function Studio({
   const [ready, setReady] = useState(false),
     [lang, setLang] = useState("en"),
     [tab, setTab] = useState("Layers"),
+    [layerQuery, setLayerQuery] = useState(""),
     [selected, setSelected] = useState<string[]>(["title"]),
     [time, setTime] = useState(0),
     [playing, setPlaying] = useState(false),
@@ -268,6 +270,11 @@ export default function Studio({
     [lang],
   );
   const selectedLayer = project.layers.find((l) => l.id === selected[0]);
+  const layerSearch = layerQuery.trim().toLocaleLowerCase();
+  const listedLayers = [...project.layers].reverse().filter((layer) =>
+    `${layer.name} ${layer.kind}`.toLocaleLowerCase().includes(layerSearch),
+  );
+  const compactWorkspace = () => window.matchMedia("(max-width: 1180px)").matches;
   const canvasIsPreset = ["1920x1080", "1080x1920", "1080x1080"].includes(
     `${project.width}x${project.height}`,
   );
@@ -652,11 +659,13 @@ export default function Studio({
     }));
     setSelected([item.id]);
     setInspectorTab("Layer");
+    if (compactWorkspace()) setMobilePanel("properties");
     return item;
   };
   const importFile = async (
     file: File,
     kind: "audio" | "cover" | "image" | "background" | "video",
+    replaceLayerId?: string,
   ) => {
     setLoading("Importing media…");
     try {
@@ -681,6 +690,24 @@ export default function Studio({
         }
       } else {
         await media.current.load(id);
+        if (replaceLayerId) {
+          const target = live.current.layers.find((item) => item.id === replaceLayerId);
+          if (!target || (target.kind !== "image" && target.kind !== "background"))
+            throw new Error("The selected layer is no longer available.");
+          if (target.kind === "image") {
+            const image = media.current.images.get(id);
+            if (!image) throw new Error("Choose an image for this layer.");
+            const aspect = image.naturalWidth / image.naturalHeight;
+            patchLayer(target.id, {
+              asset: id,
+              settings: { ...target.settings, aspect },
+              h: clamp((target.w * live.current.width) / (aspect * live.current.height), 0.1, 400),
+            });
+          } else patchLayer(target.id, { asset: id });
+          setSelected([target.id]);
+          setInspectorTab("Layer");
+          return;
+        }
         if (kind === "background" || kind === "video") {
           const bg = live.current.layers.find((l) => l.kind === "background");
           if (bg) {
@@ -706,6 +733,7 @@ export default function Studio({
             y: kind === "cover" ? 34 : 50,
           });
         }
+        if (compactWorkspace()) setMobilePanel("properties");
       }
     } catch (e) {
       setNotice(`Import failed: ${String(e)}`);
@@ -1170,14 +1198,19 @@ export default function Studio({
             <>
               <div className="panel-heading">
                 <h2>{t("Layers")}</h2>
-                <span>{project.layers.length.toString().padStart(2, "0")}</span>
+                <span>{layerSearch ? `${listedLayers.length}/${project.layers.length}` : project.layers.length.toString().padStart(2, "0")}</span>
               </div>
+              <label className="layer-search">
+                <span className="sr-only">{t("Find layer")}</span>
+                <input type="search" value={layerQuery} onChange={(e) => setLayerQuery(e.target.value)} placeholder={t("Find layer…")} aria-label={t("Find layer")} />
+              </label>
+              {layerSearch && <p className="layer-search-hint">{t("Clear search to reorder layers.")}</p>}
               <div className="layer-stack">
-                {[...project.layers].reverse().map((l) => (
+                {listedLayers.map((l) => (
                   <div
                     key={l.id}
                     className={`layer-row ${selected.includes(l.id) ? "selected" : ""} ${dragOverLayerId === l.id ? "drag-over" : ""}`}
-                    draggable={!l.locked}
+                    draggable={!l.locked && !layerSearch}
                     aria-grabbed={dragLayerId === l.id}
                     onDragStart={(e) => {
                       if (l.locked) return;
@@ -1213,6 +1246,7 @@ export default function Studio({
                           e.shiftKey ? [...new Set([...ids, l.id])] : [l.id],
                         );
                         setInspectorTab("Layer");
+                        if (compactWorkspace()) setMobilePanel("properties");
                       }}
                     >
                       <i>{icons[l.kind]}</i>
@@ -1237,6 +1271,7 @@ export default function Studio({
                     </button>
                   </div>
                 ))}
+                {!listedLayers.length && <div className="layer-search-empty">{t("No matching layers.")} <button type="button" onClick={() => setLayerQuery("")}>{t("Clear search")}</button></div>}
               </div>
               <div className="add-layer-grid">
                 {([
@@ -1378,7 +1413,7 @@ export default function Studio({
               <button type="button" className="canvas-settings-button" onClick={() => {
                 setInspectorTab("Project");
                 setWorkspaceLayout((v) => ({ ...v, rightCollapsed: false }));
-                if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("properties");
+                if (compactWorkspace()) setMobilePanel("properties");
               }}>
                 {canvasIsPreset
                   ? ({ "1920x1080": "YouTube · 16:9", "1080x1920": "Reel / Story · 9:16", "1080x1080": "Square · 1:1" } as Record<string, string>)[`${project.width}x${project.height}`]
@@ -1418,8 +1453,8 @@ export default function Studio({
           {!project.audio && !quickStartDismissed && (
             <section className="quick-start" aria-label={t("Quick start")}>
               <div><strong>{t("Start a visualizer")}</strong><span>{t("Choose a format, add music and artwork, tune layers, then preview and export.")}</span></div>
-              <button type="button" onClick={() => { setInspectorTab("Project"); setWorkspaceLayout((v) => ({ ...v, rightCollapsed: false })); if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("properties"); }}>{t("Choose canvas")}</button>
-              <button type="button" onClick={() => { setTab("Media"); if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("library"); }}>{t("Add music & artwork")}</button>
+              <button type="button" onClick={() => { setInspectorTab("Project"); setWorkspaceLayout((v) => ({ ...v, rightCollapsed: false })); if (compactWorkspace()) setMobilePanel("properties"); }}>{t("Choose canvas")}</button>
+              <button type="button" onClick={() => { setTab("Media"); if (compactWorkspace()) setMobilePanel("library"); }}>{t("Add music & artwork")}</button>
               <button type="button" onClick={() => {
                 setTab("Layers");
                 const spectrum = project.layers.find((layer) => layer.kind === "spectrum");
@@ -1430,7 +1465,7 @@ export default function Studio({
                   add("spectrum");
                   setInspectorTab("Layer");
                 }
-                if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("properties");
+                if (compactWorkspace()) setMobilePanel("properties");
               }}>{t("Tune visualizer")}</button>
               <button className="quick-start-close" type="button" aria-label={t("Dismiss guide")} title={t("Dismiss guide")} onClick={() => { setQuickStartDismissed(true); try { localStorage.setItem("vage-studio-quickstart-dismissed-v1", "1"); } catch { /* optional preference */ } }}>×</button>
             </section>
@@ -1597,38 +1632,36 @@ export default function Studio({
               <span className="timeline-context">{t("Project audio range")}</span>
               <label>
                 {t("Start")}
-                <input
-                  aria-label="Music start"
-                  type="number"
+                <NumericInput
+                  ariaLabel={t("Start")}
                   min={0}
                   max={Math.max(0, project.end - 0.1)}
                   step={0.1}
                   value={project.start}
-                  onChange={(e) => {
+                  onCommit={(value) => {
                     pause();
                     setTime(0);
                     update((p) => ({
                       ...p,
-                      start: clamp(+e.target.value, 0, p.end - 0.1),
+                      start: clamp(value, 0, p.end - 0.1),
                     }));
                   }}
                 />
               </label>
               <label>
                 {t("End")}
-                <input
-                  aria-label="Music end"
-                  type="number"
+                <NumericInput
+                  ariaLabel={t("End")}
                   min={project.start + 0.1}
                   step={0.1}
                   value={project.end}
-                  onChange={(e) => {
+                  onCommit={(value) => {
                     pause();
                     setTime(0);
                     update((p) => ({
                       ...p,
                       end: clamp(
-                        +e.target.value,
+                        value,
                         p.start + 0.1,
                         p.audioDuration || 600,
                       ),
@@ -1648,7 +1681,7 @@ export default function Studio({
               </button>
               <small>{project.export.fps} FPS</small>
             </div>
-            <LayerTimeline layers={project.layers} duration={project.end - project.start} time={time} selected={selected} onSelect={id => { setSelected([id]); setInspectorTab("Layer"); if (window.matchMedia("(max-width: 850px)").matches) setMobilePanel("properties"); }} onChange={(id, motion, remember) => patchLayer(id, { motion }, remember)} onSeek={seek} t={t} />
+            <LayerTimeline layers={project.layers} duration={project.end - project.start} time={time} selected={selected} onSelect={id => { setSelected([id]); setInspectorTab("Layer"); if (compactWorkspace()) setMobilePanel("properties"); }} onChange={(id, motion, remember) => patchLayer(id, { motion }, remember)} onSeek={seek} t={t} />
           </section>
         </section>
         <PanelResizeHandle
@@ -1748,6 +1781,21 @@ export default function Studio({
                   />
                 </div>
               </div>
+              {(selectedLayer.kind === "image" || selectedLayer.kind === "background") && (
+                <label className="replace-media-button">
+                  <span>{t(selectedLayer.asset ? "Replace layer media" : "Choose layer media")}</span>
+                  <input
+                    type="file"
+                    aria-label={t(selectedLayer.asset ? "Replace layer media" : "Choose layer media")}
+                    accept={selectedLayer.kind === "image" ? "image/*" : "image/*,video/*"}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) safely(() => importFile(file, selectedLayer.kind === "image" ? "image" : file.type.startsWith("video/") ? "video" : "background", selectedLayer.id));
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
               <LayerSettings value={selectedLayer} onChange={settings} t={t} />
               <LayerMotionControls key={selectedLayer.id} layer={selectedLayer} duration={project.end - project.start} onChange={motion => patchLayer(selectedLayer.id, { motion })} t={t} />
               {selectedLayer.asset && (
@@ -1764,7 +1812,7 @@ export default function Studio({
                 <summary>{t("Transform & position")}</summary>
                 <div className="field-grid">
                   {(["x", "y", "w", "h", "rotation"] as const).map((key) => (
-                    <label className="field" key={key}>
+                    <label className="field" key={`${selectedLayer.id}-${key}`}>
                       <span>
                         {t(
                           {
@@ -1776,20 +1824,19 @@ export default function Studio({
                           }[key],
                         )}
                       </span>
-                      <input
-                        aria-label={`Layer ${key}`}
-                        type="number"
+                      <NumericInput
+                        ariaLabel={`Layer ${key}`}
                         step={0.1}
                         value={Math.round(selectedLayer[key] * 100) / 100}
-                        onChange={(e) =>
+                        onCommit={(value) =>
                           key === "w" || key === "h"
                             ? patchLayerDimension(
                                 selectedLayer.id,
                                 key,
-                                +e.target.value,
+                                value,
                               )
                             : patchLayer(selectedLayer.id, {
-                                [key]: +e.target.value,
+                                [key]: value,
                               })
                         }
                       />
